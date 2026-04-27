@@ -1,0 +1,15 @@
+TEMA: CINEMÁTICA - MRU
+
+El Movimiento Rectilíneo Uniforme (MRU) se caracteriza por:
+1. Trayectoria en línea recta.
+2. Velocidad constante (no hay aceleración).
+
+FÓRMULA FUNDAMENTAL:
+d = v * t
+
+Donde:
+- d: Distancia recorrida (m)
+- v: Velocidad constante (m/s)
+- t: Tiempo transcurrido (s)
+
+En este laboratorio, podrás ajustar la velocidad y observar cómo la posición cambia linealmente con el tiempo.
