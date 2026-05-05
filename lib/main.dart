@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_markdown/flutter_markdown.dart'; // Requiere: flutter pub add flutter_markdown
+import 'package:url_launcher/url_launcher.dart'; // Opcional para abrir links externos
+import 'package:google_fonts/google_fonts.dart';
 
 // IMPORTS DE TODAS LAS SIMULACIONES
 import 'simulaciones/mru_simulador.dart';
@@ -21,7 +24,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
+      theme: ThemeData(
+        useMaterial3: true, 
+        colorSchemeSeed: Colors.indigo,
+        // Configuración para que el texto Markdown se vea bien
+        textTheme: const TextTheme(bodyMedium: TextStyle(fontSize: 16)),
+      ),
       home: const MenuPrincipal(),
     );
   }
@@ -31,7 +39,14 @@ class ModuloData {
   final String titulo;
   final String archivoTeoria;
   final Widget scriptSimulacion;
-  ModuloData({required this.titulo, required this.archivoTeoria, required this.scriptSimulacion});
+  final String? youtubeId; // Nuevo campo para videos de YouTube
+
+  ModuloData({
+    required this.titulo, 
+    required this.archivoTeoria, 
+    required this.scriptSimulacion,
+    this.youtubeId,
+  });
 }
 
 class MenuPrincipal extends StatelessWidget {
@@ -39,9 +54,13 @@ class MenuPrincipal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // LOS 10 TEMAS ASIGNADOS
     final List<ModuloData> listaModulos = [
-      ModuloData(titulo: '1. Cinemática', archivoTeoria: 'assets/teoria/cinematica.txt', scriptSimulacion: const MRUSimulador()),
+      ModuloData(
+        titulo: '1. Cinemática', 
+        archivoTeoria: 'assets/teoria/cinematica.txt', 
+        scriptSimulacion: const MRUSimulador(),
+        youtubeId: 'Wp_P9EsqY_A', // Ejemplo: ID de video de cinemática
+      ),
       ModuloData(titulo: '2. Leyes de Newton', archivoTeoria: 'assets/teoria/newton.txt', scriptSimulacion: const NewtonSim()),
       ModuloData(titulo: '3. Energía y Trabajo', archivoTeoria: 'assets/teoria/energia.txt', scriptSimulacion: const EnergiaSim()),
       ModuloData(titulo: '4. Óptica', archivoTeoria: 'assets/teoria/optica.txt', scriptSimulacion: const OpticaSim()),
@@ -97,7 +116,7 @@ class _DetalleModuloState extends State<DetalleModulo> {
       final texto = await rootBundle.loadString(widget.modulo.archivoTeoria);
       setState(() => contenidoTeoria = texto);
     } catch (e) {
-      setState(() => contenidoTeoria = "Próximamente: Contenido de ${widget.modulo.titulo}");
+      setState(() => contenidoTeoria = "# Próximamente\nContenido de ${widget.modulo.titulo} en construcción.");
     }
   }
 
@@ -114,12 +133,59 @@ class _DetalleModuloState extends State<DetalleModulo> {
         ),
         body: TabBarView(
           children: [
-            SingleChildScrollView(padding: const EdgeInsets.all(20), child: Text(contenidoTeoria)),
+            // PARTE 1: TEORÍA CON FORMATO
+            _buildTeoriaView(),
+            // PARTE 2: SIMULACIÓN
             Padding(padding: const EdgeInsets.all(16), child: widget.modulo.scriptSimulacion),
+            // PARTE 3: TEST
             const Center(child: Text("Cuestionario no disponible")),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildTeoriaView() {
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MarkdownBody(
+          data: contenidoTeoria,
+          imageDirectory: 'assets/imagenes',
+          styleSheet: MarkdownStyleSheet(
+            p: GoogleFonts.lato(
+              fontSize: 16, 
+              height: 1.5, 
+              color: Colors.black87,
+            ),
+            h1: GoogleFonts.montserrat(
+              fontSize: 28, 
+              fontWeight: FontWeight.bold, 
+              color: Colors.indigo,
+            ),
+            code: GoogleFonts.sourceCodePro(
+              backgroundColor: Colors.grey.shade200,
+              fontSize: 14,
+              color: Colors.red.shade900,
+            ),
+          ),
+          onTapLink: (text, href, title) {
+            if (href != null) _abrirEnlace(href);
+          },
+        ),
+        ]// ... aquí iría el botón de YouTube 
+    ),
+  );
+  
+}
+
+// Función auxiliar para abrir los links del Markdown
+Future<void> _abrirEnlace(String url) async {
+  final Uri uri = Uri.parse(url);
+  if (!await launchUrl(uri)) {
+    debugPrint('No se pudo abrir $url');
+  }
+}
 }

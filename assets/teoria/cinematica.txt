@@ -1,10 +1,10 @@
 TEMA: CINEMÁTICA - MRU
 
-El Movimiento Rectilíneo Uniforme (MRU) se caracteriza por:
+##El Movimiento Rectilíneo Uniforme (MRU) se caracteriza por:
 1. Trayectoria en línea recta.
 2. Velocidad constante (no hay aceleración).
 
-FÓRMULA FUNDAMENTAL:
+**FÓRMULA FUNDAMENTAL:**
 d = v * t
 
 Donde:
