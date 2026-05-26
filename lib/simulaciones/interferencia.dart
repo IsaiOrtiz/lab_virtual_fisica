@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Necesario para la rotación
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
@@ -12,25 +13,33 @@ class InterferenciaSim extends StatefulWidget {
 
 class _InterferenciaSimState extends State<InterferenciaSim> {
   double tiempo = 0.0;
-  
-  // Parámetros independientes de la Onda Azul (Derecha)
-  double freqAzul = 1.0;
-  double ampAzul = 30.0;
-  bool mostrarAzul = true;
-
-  // Parámetros independientes de la Onda Roja (Izquierda)
-  double freqRoja = 1.0;
-  double ampRoja = 30.0;
-  bool mostrarRoja = true;
-
-  // Control de la Onda Resultante (Púrpura)
-  bool mostrarSuma = true;
-
   Timer? _timer;
+
+  // Parámetros Onda 1 (Azul)
+  double amp1 = 30.0;
+  double freq1 = 1.0;
+  double k1 = 0.03;   // Número de onda
+  double phi1 = 0.0; // Fase inicial
+  bool vis1 = true;
+
+  // Parámetros Onda 2 (Roja)
+  double amp2 = 30.0;
+  double freq2 = 1.0;
+  double k2 = 0.03;
+  double phi2 = 0.0;
+  bool vis2 = true;
+
+  bool visSuma = true;
 
   @override
   void initState() {
     super.initState();
+    // 1. FORZAR MODO HORIZONTAL AL ENTRAR
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
     _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       setState(() {
         tiempo += 0.05;
@@ -40,220 +49,137 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
 
   @override
   void dispose() {
+    // 2. REGRESAR A MODO VERTICAL AL SALIR
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
     _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Text(
-            "Superposición Personalizada de Ondas", 
-            style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo),
-          ),
-        ),
-        
-        // Panel de Controles Avanzados
-        Expanded(
-          flex: 2,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // --- CONTROLES ONDA AZUL ---
-                _buildControlSection(
-                  titulo: "Onda Azul (Hacia la derecha)",
-                  color: Colors.blue,
-                  checkboxValue: mostrarAzul,
-                  onCheckboxChanged: (v) => setState(() => mostrarAzul = v!),
-                  sliders: [
-                    _buildSliderRow("Frecuencia", freqAzul, 0.5, 3.0, (v) => setState(() => freqAzul = v)),
-                    _buildSliderRow("Amplitud", ampAzul, 0.0, 60.0, (v) => setState(() => ampAzul = v)),
-                  ],
-                ),
-                const Divider(),
-
-                // --- CONTROLES ONDA ROJA ---
-                _buildControlSection(
-                  titulo: "Onda Roja (Hacia la izquierda)",
-                  color: Colors.red,
-                  checkboxValue: mostrarRoja,
-                  onCheckboxChanged: (v) => setState(() => mostrarRoja = v!),
-                  sliders: [
-                    _buildSliderRow("Frecuencia", freqRoja, 0.5, 3.0, (v) => setState(() => freqRoja = v)),
-                    _buildSliderRow("Amplitud", ampRoja, 0.0, 60.0, (v) => setState(() => ampRoja = v)),
-                  ],
-                ),
-                const Divider(),
-
-                // --- CONTROL RESULTANTE ---
-                CheckboxListTile(
-                  title: const Text("Mostrar Onda Resultante (Púrpura)", style: TextStyle(fontWeight: FontWeight.bold)),
-                  activeColor: Colors.purple,
-                  value: mostrarSuma,
-                  onChanged: (v) => setState(() => mostrarSuma = v!),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Área de renderizado visual de la simulación
-        Expanded(
-          flex: 3,
-          child: Container(
-            margin: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.95), // Fondo oscuro para resaltar señales
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: InterferenciaPainter(
-                tiempo: tiempo,
-                freqAzul: freqAzul,
-                ampAzul: ampAzul,
-                mostrarAzul: mostrarAzul,
-                freqRoja: freqRoja,
-                ampRoja: ampRoja,
-                mostrarRoja: mostrarRoja,
-                mostrarSuma: mostrarSuma,
+    return Scaffold(
+      body: Row(
+        children: [
+          // PANEL DE CONTROLES (IZQUIERDA)
+          Container(
+            width: 250,
+            color: Colors.grey[100],
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                children: [
+                  Text("Parámetros", style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
+                  const Divider(),
+                  _buildWaveControls("Onda Azul", Colors.blue, amp1, freq1, k1, phi1, vis1, 
+                    (v) => setState(() => amp1 = v), (v) => setState(() => freq1 = v), 
+                    (v) => setState(() => k1 = v), (v) => setState(() => phi1 = v),
+                    (v) => setState(() => vis1 = v!)),
+                  const SizedBox(height: 10),
+                  _buildWaveControls("Onda Roja", Colors.red, amp2, freq2, k2, phi2, vis2, 
+                    (v) => setState(() => amp2 = v), (v) => setState(() => freq2 = v), 
+                    (v) => setState(() => k2 = v), (v) => setState(() => phi2 = v),
+                    (v) => setState(() => vis2 = v!)),
+                  CheckboxListTile(
+                    title: const Text("Suma"),
+                    value: visSuma, 
+                    onChanged: (v) => setState(() => visSuma = v!)
+                  ),
+                ],
               ),
             ),
           ),
-        ),
-      ],
+          // ÁREA DE SIMULACIÓN (DERECHA)
+          Expanded(
+            child: Container(
+              color: Colors.black,
+              child: CustomPaint(
+                painter: WavePainter(
+                  tiempo: tiempo,
+                  a1: amp1, f1: freq1, k1: k1, p1: phi1, v1: vis1,
+                  a2: amp2, f2: freq2, k2: k2, p2: phi2, v2: vis2,
+                  vSuma: visSuma,
+                ),
+                child: Container(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // Helper para construir las secciones de control de forma limpia
-  Widget _buildControlSection({
-    required String titulo,
-    required Color color,
-    required bool checkboxValue,
-    required ValueChanged<bool?> onCheckboxChanged,
-    required List<Widget> sliders,
-  }) {
+  Widget _buildWaveControls(String label, Color color, double a, double f, double k, double p, bool v,
+      ValueChanged<double> onA, ValueChanged<double> onF, ValueChanged<double> onK, ValueChanged<double> onP, ValueChanged<bool?> onV) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CheckboxListTile(
-          title: Text(titulo, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-          activeColor: color,
-          value: checkboxValue,
-          onChanged: onCheckboxChanged,
-        ),
-        if (checkboxValue) ...sliders,
+        Row(children: [
+          Checkbox(value: v, onChanged: onV, activeColor: color),
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        ]),
+        _slider("A", a, 0, 100, onA),
+        _slider("f", f, 0.1, 100, onF),
+        // Rango de frecuencia 
+        _slider("k", k, 0.01, 1, onK),
+        _slider("φ", p, 0, 2 * math.pi, onP),
       ],
     );
   }
 
-  // Helper para renderizar cada fila de deslizadores
-  Widget _buildSliderRow(String label, double valor, double min, double max, ValueChanged<double> onChanged) {
+  Widget _slider(String txt, double val, double min, double max, ValueChanged<double> cb) {
     return Row(
       children: [
-        SizedBox(width: 80, child: Text("$label: ${valor.toStringAsFixed(1)}")),
-        Expanded(
-          child: Slider(
-            value: valor,
-            min: min,
-            max: max,
-            onChanged: onChanged,
-          ),
-        ),
+        Text(txt, style: const TextStyle(fontSize: 10)),
+        Expanded(child: Slider(value: val, min: min, max: max, onChanged: cb)),
       ],
     );
   }
 }
 
-class InterferenciaPainter extends CustomPainter {
-  final double tiempo;
-  final double freqAzul;
-  final double ampAzul;
-  final bool mostrarAzul;
-  final double freqRoja;
-  final double ampRoja;
-  final bool mostrarRoja;
-  final bool mostrarSuma;
+class WavePainter extends CustomPainter {
+  final double tiempo, a1, f1, k1, p1, a2, f2, k2, p2;
+  final bool v1, v2, vSuma;
 
-  InterferenciaPainter({
+  WavePainter({
     required this.tiempo,
-    required this.freqAzul,
-    required this.ampAzul,
-    required this.mostrarAzul,
-    required this.freqRoja,
-    required this.ampRoja,
-    required this.mostrarRoja,
-    required this.mostrarSuma,
+    required this.a1, required this.f1, required this.k1, required this.p1, required this.v1,
+    required this.a2, required this.f2, required this.k2, required this.p2, required this.v2,
+    required this.vSuma,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final centroY = size.height / 2;
-    final k = 2 * math.pi / 200; // Número de onda base común
+    final w1 = 2 * math.pi * f1;
+    final w2 = 2 * math.pi * f2;
 
-    // Frecuencias angulares independientes
-    final omegaAzul = 2 * math.pi * freqAzul;
-    final omegaRoja = 2 * math.pi * freqRoja;
-
-    final pAzul = Paint()
-      ..color = Colors.blue.withOpacity(0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final pRoja = Paint()
-      ..color = Colors.red.withOpacity(0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final pSuma = Paint()
-      ..color = Colors.purpleAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0;
-
-    final pPunto = Paint()..color = Colors.white;
-
-    Path pathAzul = Path();
-    Path pathRoja = Path();
-    Path pathSuma = Path();
+    final path1 = Path();
+    final path2 = Path();
+    final pathSuma = Path();
 
     for (double x = 0; x <= size.width; x++) {
-      // Onda 1 (Azul): Viaja a la derecha (kx - wt)
-      double y1 = ampAzul * math.sin(k * x - tiempo * omegaAzul);
-      // Onda 2 (Roja): Viaja a la izquierda (kx + wt)
-      double y2 = ampRoja * math.sin(k * x + tiempo * omegaRoja);
-      // Resultante matemática pura
-      double yTotal = y1 + y2;
+      // Ecuación: y = A * sin(kx ± wt + phi)
+      double y1 = a1 * math.sin(k1 * x - tiempo * w1 + p1);
+      double y2 = a2 * math.sin(k2 * x + tiempo * w2 + p2);
+      double yS = y1 + y2;
 
       if (x == 0) {
-        pathAzul.moveTo(x, centroY + y1);
-        pathRoja.moveTo(x, centroY + y2);
-        pathSuma.moveTo(x, centroY + yTotal);
+        path1.moveTo(x, centroY + y1);
+        path2.moveTo(x, centroY + y2);
+        pathSuma.moveTo(x, centroY + yS);
       } else {
-        pathAzul.lineTo(x, centroY + y1);
-        pathRoja.lineTo(x, centroY + y2);
-        pathSuma.lineTo(x, centroY + yTotal);
+        path1.lineTo(x, centroY + y1);
+        path2.lineTo(x, centroY + y2);
+        pathSuma.lineTo(x, centroY + yS);
       }
     }
 
-    // Dibujar caminos condicionalmente basado en la UI
-    if (mostrarAzul) canvas.drawPath(pathAzul, pAzul);
-    if (mostrarRoja) canvas.drawPath(pathRoja, pRoja);
-    if (mostrarSuma) {
-      canvas.drawPath(pathSuma, pSuma);
-      
-      // Dibujar los nodos/puntos sobre la línea resultante
-      for (double x = 0; x <= size.width; x += 40) {
-        double y1 = ampAzul * math.sin(k * x - tiempo * omegaAzul);
-        double y2 = ampRoja * math.sin(k * x + tiempo * omegaRoja);
-        canvas.drawCircle(Offset(x, centroY + y1 + y2), 3, pPunto);
-      }
-    }
+    if (v1) canvas.drawPath(path1, Paint()..color = Colors.blue.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2);
+    if (v2) canvas.drawPath(path2, Paint()..color = Colors.red.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2);
+    if (vSuma) canvas.drawPath(pathSuma, Paint()..color = Colors.purpleAccent..style = PaintingStyle.stroke..strokeWidth = 4);
   }
 
   @override
-  bool shouldRepaint(covariant InterferenciaPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
