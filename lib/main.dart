@@ -47,13 +47,16 @@ class MyApp extends StatelessWidget {
 class ModuloData {
   final String titulo;
   final String archivoTeoria;
-  final Widget scriptSimulacion;
+  // En lugar de un Widget fijo, usamos una función "constructora" que
+  // recibe los callbacks para saltar a la pestaña de Teoría o de
+  // Cuestionario, y devuelve el widget de simulación ya configurado.
+  final Widget Function(VoidCallback irATeoria, VoidCallback irACuestionario) construirSimulacion;
   final String categoria;
 
   ModuloData({
     required this.titulo,
     required this.archivoTeoria,
-    required this.scriptSimulacion,
+    required this.construirSimulacion,
     required this.categoria,
   });
 }
@@ -67,23 +70,88 @@ class MenuPrincipal extends StatelessWidget {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
     final List<ModuloData> listaModulos = [
-      ModuloData(titulo: 'Ondas Viajeras', archivoTeoria: 'assets/teoria/ondas_viajeras.txt', scriptSimulacion: const OndaViajeraSim(), categoria: 'Acústica y Ondas'),
-      ModuloData(titulo: 'Interferencia de Ondas', archivoTeoria: 'assets/teoria/interferencia.txt', scriptSimulacion: const InterferenciaSim(), categoria: 'Acústica y Ondas'),
-      ModuloData(titulo: 'Ondas Estacionarias', archivoTeoria: 'assets/teoria/estacionarias.txt', scriptSimulacion: const OndasEstacionariasSim(), categoria: 'Acústica y Ondas'),
-      ModuloData(titulo: 'Ondas Longitudinales', archivoTeoria: 'assets/teoria/longitudinales.txt', scriptSimulacion: const Placeholder(), categoria: 'Acústica y Ondas'),
-      ModuloData(titulo: 'Modos Normales', archivoTeoria: 'assets/teoria/modos_normales.txt', scriptSimulacion: const Placeholder(), categoria: 'Acústica y Ondas'),
-      ModuloData(titulo: 'Reflexión de la Luz', archivoTeoria: 'assets/teoria/reflexion.txt', scriptSimulacion: const Placeholder(), categoria: 'Óptica'),
-      ModuloData(titulo: 'Refracción de la Luz', archivoTeoria: 'assets/teoria/refraccion.txt', scriptSimulacion: const Placeholder(), categoria: 'Óptica'),
-      ModuloData(titulo: 'Espejos Curvos', archivoTeoria: 'assets/teoria/espejos.txt', scriptSimulacion: const Placeholder(), categoria: 'Óptica'),
-      ModuloData(titulo: 'Lentes Delgadas', archivoTeoria: 'assets/teoria/lentes.txt', scriptSimulacion: const Placeholder(), categoria: 'Óptica'),
-      ModuloData(titulo: 'Principio de Bernoulli', archivoTeoria: 'assets/teoria/bernoulli.txt', scriptSimulacion: const Placeholder(), categoria: 'Fluidos'),
-      ModuloData(titulo: 'Conservación del Gasto', archivoTeoria: 'assets/teoria/gasto.txt', scriptSimulacion: const Placeholder(), categoria: 'Fluidos'),
-      ModuloData(titulo: 'Conservación de la Energía', archivoTeoria: 'assets/teoria/energia.txt', scriptSimulacion: const Placeholder(), categoria: 'Fluidos'),
-      ModuloData(titulo: 'Ecuación de Poiseuille', archivoTeoria: 'assets/teoria/poiseuille.txt', scriptSimulacion: const Placeholder(), categoria: 'Fluidos'),
+      ModuloData(
+        titulo: 'Ondas Viajeras',
+        archivoTeoria: 'assets/teoria/ondas_viajeras.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => OndaViajeraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Interferencia de Ondas',
+        archivoTeoria: 'assets/teoria/interferencia.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => InterferenciaSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Ondas Estacionarias',
+        archivoTeoria: 'assets/teoria/estacionarias.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => OndasEstacionariasSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Ondas Longitudinales',
+        archivoTeoria: 'assets/teoria/longitudinales.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => OndasLongitudinalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Modos Normales',
+        archivoTeoria: 'assets/teoria/modos_normales.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => ModosNormalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Reflexión de la Luz',
+        archivoTeoria: 'assets/teoria/reflexion.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Óptica',
+      ),
+      ModuloData(
+        titulo: 'Refracción de la Luz',
+        archivoTeoria: 'assets/teoria/refraccion.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Óptica',
+      ),
+      ModuloData(
+        titulo: 'Espejos Curvos',
+        archivoTeoria: 'assets/teoria/espejos.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Óptica',
+      ),
+      ModuloData(
+        titulo: 'Lentes Delgadas',
+        archivoTeoria: 'assets/teoria/lentes.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Óptica',
+      ),
+      ModuloData(
+        titulo: 'Principio de Bernoulli',
+        archivoTeoria: 'assets/teoria/bernoulli.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Fluidos',
+      ),
+      ModuloData(
+        titulo: 'Conservación del Gasto',
+        archivoTeoria: 'assets/teoria/gasto.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Fluidos',
+      ),
+      ModuloData(
+        titulo: 'Conservación de la Energía',
+        archivoTeoria: 'assets/teoria/energia.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Fluidos',
+      ),
+      ModuloData(
+        titulo: 'Ecuación de Poiseuille',
+        archivoTeoria: 'assets/teoria/poiseuille.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        categoria: 'Fluidos',
+      ),
     ];
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: CustomScrollView(
         slivers: [
           // Header moderno colapsable
@@ -226,13 +294,32 @@ class DetalleModulo extends StatefulWidget {
   State<DetalleModulo> createState() => _DetalleModuloState();
 }
 
-class _DetalleModuloState extends State<DetalleModulo> {
+class _DetalleModuloState extends State<DetalleModulo> with SingleTickerProviderStateMixin {
   String contenidoTeoria = "Cargando teoría...";
+  late TabController _tabController;
+  int _indiceActual = 0;
+
+  // Índice de la pestaña de Simulación dentro del TabBar (Teoría=0, Simulación=1, Test=2)
+  static const int _indiceSimulacion = 1;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      // Solo reaccionamos cuando el índice realmente cambió, para evitar
+      // reconstrucciones innecesarias durante el arrastre del TabBar.
+      if (_tabController.index != _indiceActual) {
+        setState(() => _indiceActual = _tabController.index);
+      }
+    });
     _cargarTexto();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarTexto() async {
@@ -246,28 +333,41 @@ class _DetalleModuloState extends State<DetalleModulo> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.modulo.titulo, style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, fontSize: 18)),
-          bottom: TabBar(
-            labelColor: const Color(0xFF1A237E),
-            unselectedLabelColor: Colors.black45,
-            indicatorColor: const Color(0xFF1A237E),
-            indicatorWeight: 3,
-            labelStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, fontSize: 14),
-            tabs: const [Tab(text: 'Teoría'), Tab(text: 'Simulación'), Tab(text: 'Test')],
+    final bool enSimulacion = _indiceActual == _indiceSimulacion;
+
+    return Scaffold(
+      // Cuando se entra a la Simulación se oculta el AppBar completo
+      // (título + las 3 pestañas de Teoría / Simulación / Test) para que
+      // la simulación use toda la pantalla en horizontal.
+      appBar: enSimulacion
+          ? null
+          : AppBar(
+              title: Text(widget.modulo.titulo, style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, fontSize: 18)),
+              bottom: TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF1A237E),
+                unselectedLabelColor: Colors.black45,
+                indicatorColor: const Color(0xFF1A237E),
+                indicatorWeight: 3,
+                labelStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, fontSize: 14),
+                tabs: const [Tab(text: 'Teoría'), Tab(text: 'Simulación'), Tab(text: 'Test')],
+              ),
+            ),
+      body: TabBarView(
+        controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(), // Evita conflictos de arrastre con los sliders del simulador
+        children: [
+          _buildTeoriaView(),
+          // Construimos la simulación pasándole funciones que le permiten
+          // saltar directamente a la pestaña de Teoría (índice 0) o de
+          // Cuestionario (índice 2) desde un botón dentro de la propia
+          // simulación, sin necesidad de mostrar la barra de pestañas.
+          widget.modulo.construirSimulacion(
+            () => _tabController.animateTo(0),
+            () => _tabController.animateTo(2),
           ),
-        ),
-        body: TabBarView(
-          physics: const NeverScrollableScrollPhysics(), // Evita conflictos de arrastre con los sliders del simulador
-          children: [
-            _buildTeoriaView(),
-            widget.modulo.scriptSimulacion, // Eliminado el padding forzado para dejar que el simulador horizontal use toda la pantalla
-            const Center(child: Text("Cuestionario disponible próximamente")),
-          ],
-        ),
+          const Center(child: Text("Cuestionario disponible próximamente")),
+        ],
       ),
     );
   }

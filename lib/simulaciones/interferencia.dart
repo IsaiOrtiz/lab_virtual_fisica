@@ -5,9 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
+import '../widgets/zoom_pan_controls.dart';
+import '../widgets/navegacion_simulacion.dart';
 
 class InterferenciaSim extends StatefulWidget {
-  const InterferenciaSim({super.key});
+  final VoidCallback? onIrATeoria;
+  final VoidCallback? onIrACuestionario;
+
+  const InterferenciaSim({super.key, this.onIrATeoria, this.onIrACuestionario});
 
   @override
   State<InterferenciaSim> createState() => _InterferenciaSimState();
@@ -21,6 +26,9 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
 
   // Llave global para capturar la pantalla de la simulación de forma aislada
   final GlobalKey _globalKeyCaptura = GlobalKey();
+
+  // Controlador de transformación para Zoom y Pan (desplazamiento) táctil/con botones
+  final TransformationController _transformationController = TransformationController();
 
   // Parámetros Onda 1 (Azul)
   double amp1 = 30.0;
@@ -59,6 +67,7 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
   @override
   void dispose() {
     _timer?.cancel();
+    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -158,6 +167,11 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
 
             final maxSliderAmplitud = espacioMaxAbsoluto / 2;
 
+            // Tamaño real del área de dibujo (sin contar el panel lateral),
+            // usado para centrar el zoom con los botones.
+            final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
+            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
+
             return Row(
               children: [
                 // PANEL DE CONTROLES COLAPSABLE CON ANIMACIÓN
@@ -213,17 +227,43 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: Container(
-                          color: const Color(0xFFF8FAFC), 
-                          child: CustomPaint(
-                            painter: WavePainter(
-                              tiempo: tiempo,
-                              a1: amp1, f1: freq1, k1: k1, p1: phi1, v1: vis1,
-                              a2: amp2, f2: freq2, k2: k2, p2: phi2, v2: vis2,
-                              vSuma: visSuma,
+                        child: InteractiveViewer(
+                          transformationController: _transformationController,
+                          minScale: 0.5,
+                          maxScale: 6.0,
+                          boundaryMargin: const EdgeInsets.all(600),
+                          child: Container(
+                            color: const Color(0xFFF8FAFC), 
+                            child: CustomPaint(
+                              painter: WavePainter(
+                                tiempo: tiempo,
+                                a1: amp1, f1: freq1, k1: k1, p1: phi1, v1: vis1,
+                                a2: amp2, f2: freq2, k2: k2, p2: phi2, v2: vis2,
+                                vSuma: visSuma,
+                              ),
+                              child: Container(),
                             ),
-                            child: Container(),
                           ),
+                        ),
+                      ),
+
+                      // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: ZoomPanControls(
+                          controller: _transformationController,
+                          viewportSize: tamanoCanvas,
+                        ),
+                      ),
+
+                      // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        child: BotonesNavegacionTabs(
+                          onIrATeoria: widget.onIrATeoria,
+                          onIrACuestionario: widget.onIrACuestionario,
                         ),
                       ),
                       
