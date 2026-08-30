@@ -13,6 +13,7 @@ import 'simulaciones/lente_delg.dart';
 import 'simulaciones/bernoulli.dart';
 import 'simulaciones/interferencia.dart';
 import 'simulaciones/modo_normal.dart';
+import 'simulaciones/modo_normal_frontera.dart';
 import 'simulaciones/onda.dart';
 import 'simulaciones/reflexion.dart';
 import 'simulaciones/poiseuille.dart';
@@ -98,6 +99,12 @@ class MenuPrincipal extends StatelessWidget {
         titulo: 'Modos Normales',
         archivoTeoria: 'assets/teoria/modos_normales.txt',
         construirSimulacion: (irATeoria, irACuestionario) => ModosNormalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        categoria: 'Acústica y Ondas',
+      ),
+      ModuloData(
+        titulo: 'Modos Normales: Fronteras Mixtas y Libres',
+        archivoTeoria: 'assets/teoria/modos_normales_frontera.txt',
+        construirSimulacion: (irATeoria, irACuestionario) => ModosNormalesFronteraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(

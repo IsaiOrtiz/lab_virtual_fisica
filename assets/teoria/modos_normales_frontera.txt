@@ -1,0 +1,58 @@
+# Modos Normales: Fronteras Fijo-Abierto y Abierto-Abierto
+
+Cuando una cuerda o columna de aire vibra, la forma de sus modos normales
+depende de cómo están sujetos sus extremos. Ya viste el caso **fijo-fijo**
+(ambos extremos anclados); aquí exploramos los otros dos casos clásicos.
+
+## Extremo fijo vs. extremo libre
+
+- **Extremo fijo:** no puede moverse. Siempre es un **nodo** (desplazamiento
+  cero).
+- **Extremo libre:** puede moverse con máxima amplitud. Siempre es un
+  **antinodo**.
+
+## Frontera Fijo-Abierto
+
+Un extremo fijo (nodo) y un extremo libre (antinodo). Esta condición solo
+permite **armónicos impares**:
+
+k = 1, 3, 5, 7, 9, 11, ...
+
+La longitud de la cuerda debe contener un número impar de **cuartos** de
+longitud de onda:
+
+L = k·λ/4  →  λₖ = 4L/k
+
+La frecuencia de cada modo es:
+
+fₖ = k·v/(4L),  con v = √(T/μ)
+
+## Frontera Abierto-Abierto
+
+Ambos extremos libres (antinodo en los dos lados). Aquí sí existen
+**todos los armónicos**:
+
+k = 1, 2, 3, 4, 5, 6, ...
+
+La longitud de la cuerda contiene un número entero de **medias** longitudes
+de onda:
+
+L = k·λ/2  →  λₖ = 2L/k
+
+La frecuencia de cada modo es:
+
+fₖ = k·v/(2L)
+
+Nota que esta es la misma fórmula que en el caso fijo-fijo, aunque la forma
+de la onda es distinta: aquí hay antinodos en los extremos en lugar de
+nodos.
+
+## ¿Dónde se observa esto?
+
+- Fijo-Abierto: una cuerda de guitarra pisada contra un extremo fijo pero
+  "suelta" en el otro es poco común en cuerdas, pero es exactamente el
+  comportamiento de un **tubo cerrado en un extremo** (como una botella o
+  un clarinete).
+- Abierto-Abierto: es el comportamiento de un **tubo abierto en ambos
+  extremos** (como una flauta), o de una cuerda cuyos dos extremos pueden
+  deslizarse libremente en un riel sin fricción.

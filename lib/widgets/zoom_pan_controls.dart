@@ -28,21 +28,31 @@ class ZoomPanControls extends StatelessWidget {
   });
 
   void _zoomPor(double factor) {
-    final Matrix4 m = controller.value.clone();
     final double cx = viewportSize.width / 2;
     final double cy = viewportSize.height / 2;
-    // Hacemos zoom centrado en el medio del área visible, no en la
-    // esquina (0,0), para que el acercamiento se sienta natural.
-    m.translate(cx, cy);
-    m.scale(factor);
-    m.translate(-cx, -cy);
-    controller.value = m;
+    // IMPORTANTE: la transformación de un InteractiveViewer mapea
+    // coordenadas del hijo -> coordenadas del viewport. Para que el
+    // zoom quede centrado en el punto (cx, cy) DEL VIEWPORT sin
+    // importar cuánto se haya movido/escalado antes, la corrección de
+    // centrado (T * S * T⁻¹) debe multiplicarse por la IZQUIERDA del
+    // matrix actual, no por la derecha (m.translate(...) hace lo
+    // segundo, que aplica el offset en el espacio local del hijo y
+    // provocaba que el zoom se descentrara tras el primer pellizco o
+    // arrastre).
+    final Matrix4 correccion = Matrix4.identity()
+      ..translate(cx, cy)
+      ..scale(factor)
+      ..translate(-cx, -cy);
+    controller.value = correccion.multiplied(controller.value);
   }
 
   void _panPor(double dx, double dy) {
-    final Matrix4 m = controller.value.clone();
-    m.translate(dx, dy);
-    controller.value = m;
+    // Mismo problema: el desplazamiento debe ocurrir en coordenadas
+    // del viewport (multiplicar por la izquierda), para que el paso
+    // de cada botón se sienta igual sin importar el nivel de zoom
+    // actual.
+    final Matrix4 desplazamiento = Matrix4.identity()..translate(dx, dy);
+    controller.value = desplazamiento.multiplied(controller.value);
   }
 
   void _resetear() {
