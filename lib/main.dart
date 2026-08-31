@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter_markdown/flutter_markdown.dart'; // Requiere: flutter pub add flutter_markdown
 import 'package:url_launcher/url_launcher.dart'; // Opcional para abrir links externos
 import 'package:google_fonts/google_fonts.dart';
+
+// CUESTIONARIO: modelo, banco de preguntas y pantalla del cuestionario/PDF
+import 'cuestionarios/banco_preguntas.dart';
+import 'cuestionarios/cuestionario_screen.dart';
 
 // IMPORTS DE TODAS LAS SIMULACIONES
 import 'simulaciones/refraccion.dart';
@@ -50,8 +55,15 @@ class ModuloData {
   final String archivoTeoria;
   // En lugar de un Widget fijo, usamos una función "constructora" que
   // recibe los callbacks para saltar a la pestaña de Teoría o de
-  // Cuestionario, y devuelve el widget de simulación ya configurado.
-  final Widget Function(VoidCallback irATeoria, VoidCallback irACuestionario) construirSimulacion;
+  // Cuestionario, y una función para reportar cada captura de pantalla
+  // que el usuario tome dentro de la simulación (se usará luego para
+  // armar el PDF del cuestionario), y devuelve el widget de simulación
+  // ya configurado.
+  final Widget Function(
+    VoidCallback irATeoria,
+    VoidCallback irACuestionario,
+    void Function(Uint8List bytes) onCapturar,
+  ) construirSimulacion;
   final String categoria;
 
   ModuloData({
@@ -74,85 +86,85 @@ class MenuPrincipal extends StatelessWidget {
       ModuloData(
         titulo: 'Ondas Viajeras',
         archivoTeoria: 'assets/teoria/ondas_viajeras.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => OndaViajeraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => OndaViajeraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Interferencia de Ondas',
         archivoTeoria: 'assets/teoria/interferencia.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => InterferenciaSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => InterferenciaSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Ondas Estacionarias',
         archivoTeoria: 'assets/teoria/estacionarias.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => OndasEstacionariasSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => OndasEstacionariasSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Ondas Longitudinales',
         archivoTeoria: 'assets/teoria/longitudinales.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => OndasLongitudinalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => OndasLongitudinalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Modos Normales',
         archivoTeoria: 'assets/teoria/modos_normales.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => ModosNormalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => ModosNormalesSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Modos Normales: Fronteras Mixtas y Libres',
         archivoTeoria: 'assets/teoria/modos_normales_frontera.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => ModosNormalesFronteraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => ModosNormalesFronteraSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Acústica y Ondas',
       ),
       ModuloData(
         titulo: 'Reflexión de la Luz',
         archivoTeoria: 'assets/teoria/reflexion.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Óptica',
       ),
       ModuloData(
         titulo: 'Refracción de la Luz',
         archivoTeoria: 'assets/teoria/refraccion.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Óptica',
       ),
       ModuloData(
         titulo: 'Espejos Curvos',
         archivoTeoria: 'assets/teoria/espejos.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Óptica',
       ),
       ModuloData(
         titulo: 'Lentes Delgadas',
         archivoTeoria: 'assets/teoria/lentes.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Óptica',
       ),
       ModuloData(
         titulo: 'Principio de Bernoulli',
         archivoTeoria: 'assets/teoria/bernoulli.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Fluidos',
       ),
       ModuloData(
         titulo: 'Conservación del Gasto',
         archivoTeoria: 'assets/teoria/gasto.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Fluidos',
       ),
       ModuloData(
         titulo: 'Conservación de la Energía',
         archivoTeoria: 'assets/teoria/energia.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Fluidos',
       ),
       ModuloData(
         titulo: 'Ecuación de Poiseuille',
         archivoTeoria: 'assets/teoria/poiseuille.txt',
-        construirSimulacion: (irATeoria, irACuestionario) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
         categoria: 'Fluidos',
       ),
     ];
@@ -306,6 +318,15 @@ class _DetalleModuloState extends State<DetalleModulo> with SingleTickerProvider
   late TabController _tabController;
   int _indiceActual = 0;
 
+  // Capturas de pantalla que el usuario ha tomado en la simulación de
+  // este módulo (botón de cámara). Se acumulan aquí para poder incluirlas
+  // luego en el PDF que genera la pestaña de Cuestionario.
+  final List<Uint8List> _capturas = [];
+
+  void _registrarCaptura(Uint8List bytes) {
+    setState(() => _capturas.add(bytes));
+  }
+
   // Índice de la pestaña de Simulación dentro del TabBar (Teoría=0, Simulación=1, Test=2)
   static const int _indiceSimulacion = 1;
 
@@ -372,8 +393,13 @@ class _DetalleModuloState extends State<DetalleModulo> with SingleTickerProvider
           widget.modulo.construirSimulacion(
             () => _tabController.animateTo(0),
             () => _tabController.animateTo(2),
+            _registrarCaptura,
           ),
-          const Center(child: Text("Cuestionario disponible próximamente")),
+          CuestionarioScreen(
+            tituloModulo: widget.modulo.titulo,
+            preguntas: preguntasDeModulo(widget.modulo.titulo),
+            capturas: _capturas,
+          ),
         ],
       ),
     );

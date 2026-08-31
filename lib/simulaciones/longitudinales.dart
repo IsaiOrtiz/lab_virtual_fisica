@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Simulación de Ondas Longitudinales (p.ej. ondas de sonido).
@@ -16,8 +17,11 @@ import '../widgets/navegacion_simulacion.dart';
 class OndasLongitudinalesSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const OndasLongitudinalesSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const OndasLongitudinalesSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<OndasLongitudinalesSim> createState() => _OndasLongitudinalesSimState();
@@ -76,6 +80,7 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -240,25 +245,17 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFF111827), // Gris pizarra muy oscuro
-                            child: CustomPaint(
-                              painter: LongitudinalWavePainter(
-                                tiempo: tiempo,
-                                amplitud: amplitud,
-                                frecuencia: frecuencia,
-                                k: k,
-                                haciaDerecha: derecha,
-                                numParticulas: numParticulas,
-                                mostrarGrafica: mostrarGrafica,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          colorFondo: const Color(0xFF111827), // Gris pizarra muy oscuro
+                          contenidoPainter: LongitudinalWavePainter(
+                            tiempo: tiempo,
+                            amplitud: amplitud,
+                            frecuencia: frecuencia,
+                            k: k,
+                            haciaDerecha: derecha,
+                            numParticulas: numParticulas,
+                            mostrarGrafica: mostrarGrafica,
                           ),
                         ),
                       ),
@@ -402,18 +399,10 @@ class LongitudinalWavePainter extends CustomPainter {
     final w = 2 * math.pi * frecuencia;
     final double argumentoTiempo = haciaDerecha ? (tiempo * w) : -(tiempo * w);
 
-    // ---- Cuadrícula de fondo (estilo consistente con las demás simulaciones) ----
-    const double pasoMalla = 10.0;
-    final pinturaMallaFina = Paint()..color = Colors.white.withOpacity(0.02)..strokeWidth = 0.5;
-    final pinturaMallaPrincipal = Paint()..color = Colors.white.withOpacity(0.06)..strokeWidth = 1.0;
-    for (double y = 0; y <= size.height; y += pasoMalla) {
-      final esPrincipal = (y / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
-    for (double x = 0; x <= size.width; x += pasoMalla) {
-      final esPrincipal = (x / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
+    // NOTA: la cuadrícula de fondo ahora vive en una capa fija aparte
+    // (FondoCuadriculaPainter, ver ZoomableSimulationCanvas) que nunca
+    // se transforma, así el "plano" siempre ocupa el mismo espacio en
+    // pantalla y solo el contenido (partículas/onda) hace zoom/pan.
 
     // ---- Gráfica auxiliar de desplazamiento (opcional, parte superior) ----
     final double yGrafica = size.height * 0.22;

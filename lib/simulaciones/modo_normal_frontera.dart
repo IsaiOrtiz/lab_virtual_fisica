@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Condición de frontera de la cuerda/columna vibrante.
@@ -28,8 +29,11 @@ enum CondicionFrontera { fijoAbierto, abiertoAbierto }
 class ModosNormalesFronteraSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const ModosNormalesFronteraSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const ModosNormalesFronteraSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<ModosNormalesFronteraSim> createState() => _ModosNormalesFronteraSimState();
@@ -149,6 +153,7 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -348,25 +353,17 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFF1A1025), // Morado oscuro premium
-                            child: CustomPaint(
-                              painter: NormalModeFronteraPainter(
-                                tiempo: tiempo,
-                                amplitud: amplitud,
-                                armonicoK: armonicoK,
-                                frecuenciaModo: frecuenciaModo,
-                                condicion: condicion,
-                                mostrarEnvolvente: mostrarEnvolvente,
-                                mostrarNodos: mostrarNodos,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          colorFondo: const Color(0xFF1A1025), // Morado oscuro premium
+                          contenidoPainter: NormalModeFronteraPainter(
+                            tiempo: tiempo,
+                            amplitud: amplitud,
+                            armonicoK: armonicoK,
+                            frecuenciaModo: frecuenciaModo,
+                            condicion: condicion,
+                            mostrarEnvolvente: mostrarEnvolvente,
+                            mostrarNodos: mostrarNodos,
                           ),
                         ),
                       ),
@@ -527,18 +524,8 @@ class NormalModeFronteraPainter extends CustomPainter {
     final double wn = 2 * math.pi * frecuenciaModo;
     final double cosT = math.cos(wn * tiempo);
 
-    // ---- Cuadrícula de fondo ----
-    const double pasoMalla = 10.0;
-    final pinturaMallaFina = Paint()..color = Colors.white.withOpacity(0.02)..strokeWidth = 0.5;
-    final pinturaMallaPrincipal = Paint()..color = Colors.white.withOpacity(0.06)..strokeWidth = 1.0;
-    for (double y = 0; y <= size.height; y += pasoMalla) {
-      final esPrincipal = (y / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
-    for (double x = 0; x <= size.width; x += pasoMalla) {
-      final esPrincipal = (x / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
+    // NOTA: la cuadrícula de fondo vive en una capa fija aparte
+    // (FondoCuadriculaPainter) que nunca se transforma.
 
     // Eje central de referencia
     canvas.drawLine(

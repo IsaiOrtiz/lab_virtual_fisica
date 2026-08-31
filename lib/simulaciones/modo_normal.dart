@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Simulación de Modos Normales de vibración de una cuerda fija en
@@ -17,8 +18,11 @@ import '../widgets/navegacion_simulacion.dart';
 class ModosNormalesSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const ModosNormalesSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const ModosNormalesSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<ModosNormalesSim> createState() => _ModosNormalesSimState();
@@ -96,6 +100,7 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -261,24 +266,16 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFF1A1025), // Morado oscuro premium
-                            child: CustomPaint(
-                              painter: NormalModePainter(
-                                tiempo: tiempo,
-                                amplitud: amplitud,
-                                modo: modo,
-                                frecuenciaModo: frecuenciaModo,
-                                mostrarEnvolvente: mostrarEnvolvente,
-                                mostrarNodos: mostrarNodos,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          colorFondo: const Color(0xFF1A1025), // Morado oscuro premium
+                          contenidoPainter: NormalModePainter(
+                            tiempo: tiempo,
+                            amplitud: amplitud,
+                            modo: modo,
+                            frecuenciaModo: frecuenciaModo,
+                            mostrarEnvolvente: mostrarEnvolvente,
+                            mostrarNodos: mostrarNodos,
                           ),
                         ),
                       ),
@@ -424,18 +421,10 @@ class NormalModePainter extends CustomPainter {
 
     final double wn = 2 * math.pi * frecuenciaModo;
 
-    // ---- Cuadrícula de fondo ----
-    const double pasoMalla = 10.0;
-    final pinturaMallaFina = Paint()..color = Colors.white.withOpacity(0.02)..strokeWidth = 0.5;
-    final pinturaMallaPrincipal = Paint()..color = Colors.white.withOpacity(0.06)..strokeWidth = 1.0;
-    for (double y = 0; y <= size.height; y += pasoMalla) {
-      final esPrincipal = (y / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
-    for (double x = 0; x <= size.width; x += pasoMalla) {
-      final esPrincipal = (x / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
+    // NOTA: la cuadrícula de fondo ya no se dibuja aquí — vive en una
+    // capa fija aparte (FondoCuadriculaPainter) que nunca se transforma,
+    // así el "plano" de la simulación siempre ocupa el mismo espacio en
+    // pantalla y solo la cuerda hace zoom/pan.
 
     // Eje central de referencia
     canvas.drawLine(

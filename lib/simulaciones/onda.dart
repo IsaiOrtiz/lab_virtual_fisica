@@ -6,13 +6,17 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class OndaViajeraSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const OndaViajeraSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const OndaViajeraSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<OndaViajeraSim> createState() => _OndaViajeraSimState();
@@ -76,6 +80,7 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -230,24 +235,16 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFF0D1117), // Fondo oscuro estilo osciloscopio
-                            child: CustomPaint(
-                              painter: SingleWavePainter(
-                                tiempo: tiempo,
-                                amplitud: amplitud,
-                                frecuencia: frecuencia,
-                                k: k,
-                                phi: phi,
-                                haciaDerecha: derecha,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          colorFondo: const Color(0xFF0D1117), // Fondo oscuro estilo osciloscopio
+                          contenidoPainter: SingleWavePainter(
+                            tiempo: tiempo,
+                            amplitud: amplitud,
+                            frecuencia: frecuencia,
+                            k: k,
+                            phi: phi,
+                            haciaDerecha: derecha,
                           ),
                         ),
                       ),
@@ -385,41 +382,10 @@ class SingleWavePainter extends CustomPainter {
     final centroY = size.height / 2;
     final w = 2 * math.pi * frecuencia; // Frecuencia angular (omega)
 
-    const double pasoMalla = 10.0;
-
-    final pinturaMallaFina = Paint()
-      ..color = Colors.white.withOpacity(0.02)
-      ..strokeWidth = 0.5;
-
-    final pinturaMallaPrincipal = Paint()
-      ..color = Colors.white.withOpacity(0.07)
-      ..strokeWidth = 1.0;
-
-    // Cuadrícula de fondo estilo osciloscopio + etiquetas de amplitud
-    for (double y = 0; y <= size.height; y += pasoMalla) {
-      final esPrincipal = (y / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-
-      if (esPrincipal) {
-        double deltaY = -(y - centroY);
-        if (deltaY.abs() > 0.1) {
-          final textPainter = TextPainter(
-            text: TextSpan(
-              text: "${deltaY.toStringAsFixed(0)} px",
-              style: GoogleFonts.sourceCodePro(fontSize: 8, color: Colors.greenAccent.withOpacity(0.4), fontWeight: FontWeight.bold),
-            ),
-            textDirection: TextDirection.ltr,
-          );
-          textPainter.layout();
-          textPainter.paint(canvas, Offset(8, y - 4));
-        }
-      }
-    }
-
-    for (double x = 0; x <= size.width; x += pasoMalla) {
-      final esPrincipal = (x / pasoMalla) % 5 == 0;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
-    }
+    // NOTA: la cuadrícula de fondo (y sus etiquetas de amplitud) ahora
+    // vive en una capa fija aparte (FondoCuadriculaPainter) que nunca se
+    // transforma, así el "plano" siempre ocupa el mismo espacio en
+    // pantalla y solo la onda hace zoom/pan.
 
     // Línea de referencia central (Eje X)
     final ejePaint = Paint()

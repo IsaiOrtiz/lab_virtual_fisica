@@ -6,13 +6,17 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class OndasEstacionariasSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const OndasEstacionariasSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const OndasEstacionariasSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<OndasEstacionariasSim> createState() => _OndasEstacionariasSimState();
@@ -74,6 +78,7 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -211,23 +216,15 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFF0F172A), // Azul pizarra oscuro premium
-                            child: CustomPaint(
-                              painter: StandingWavePainter(
-                                tiempo: tiempo,
-                                a: amplitudComponente,
-                                f: frecuencia,
-                                k: k,
-                                dibujarComponentes: mostrarComponentes,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          fondoPainter: const _FondoReglaEstacionaria(),
+                          contenidoPainter: StandingWavePainter(
+                            tiempo: tiempo,
+                            a: amplitudComponente,
+                            f: frecuencia,
+                            k: k,
+                            dibujarComponentes: mostrarComponentes,
                           ),
                         ),
                       ),
@@ -349,23 +346,19 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
   }
 }
 
-class StandingWavePainter extends CustomPainter {
-  final double tiempo, a, f, k;
-  final bool dibujarComponentes;
-
-  StandingWavePainter({
-    required this.tiempo,
-    required this.a,
-    required this.f,
-    required this.k,
-    required this.dibujarComponentes,
-  });
+/// Fondo FIJO estilo "azul pizarra" con cuadrícula y etiquetas de
+/// amplitud en px. Vive en una capa aparte que nunca se transforma con
+/// el zoom/pan (ver [ZoomableSimulationCanvas]), así el "plano" siempre
+/// ocupa el mismo espacio en pantalla; solo las curvas de onda se
+/// acercan o desplazan.
+class _FondoReglaEstacionaria extends CustomPainter {
+  const _FondoReglaEstacionaria();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final centroY = size.height / 2;
-    final omega = 2 * math.pi * f;
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0F172A));
 
+    final centroY = size.height / 2;
     const double pasoMalla = 10.0;
 
     final pinturaMallaFina = Paint()
@@ -376,7 +369,6 @@ class StandingWavePainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.07)
       ..strokeWidth = 1.0;
 
-    // Cuadrícula de fondo estilo "azul pizarra" + etiquetas de amplitud
     for (double y = 0; y <= size.height; y += pasoMalla) {
       final esPrincipal = (y / pasoMalla) % 5 == 0;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
@@ -402,12 +394,38 @@ class StandingWavePainter extends CustomPainter {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
     }
 
-    // Eje de referencia central
     canvas.drawLine(
       Offset(0, centroY),
       Offset(size.width, centroY),
       Paint()..color = Colors.white.withOpacity(0.18)..strokeWidth = 1.2,
     );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FondoReglaEstacionaria oldDelegate) => false;
+}
+
+class StandingWavePainter extends CustomPainter {
+  final double tiempo, a, f, k;
+  final bool dibujarComponentes;
+
+  StandingWavePainter({
+    required this.tiempo,
+    required this.a,
+    required this.f,
+    required this.k,
+    required this.dibujarComponentes,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centroY = size.height / 2;
+    final omega = 2 * math.pi * f;
+
+    // NOTA: la cuadrícula, las etiquetas de amplitud y el eje central
+    // ahora viven en _FondoReglaEstacionaria, una capa fija aparte que
+    // nunca se transforma con el zoom/pan, así el "plano" siempre ocupa
+    // el mismo espacio en pantalla.
 
     final pathDerecha = Path();
     final pathIzquierda = Path();

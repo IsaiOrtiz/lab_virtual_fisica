@@ -6,13 +6,17 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
+import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class InterferenciaSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
+  // Se llama con los bytes PNG cada vez que el usuario toma una
+  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
+  final void Function(Uint8List bytes)? onCapturar;
 
-  const InterferenciaSim({super.key, this.onIrATeoria, this.onIrACuestionario});
+  const InterferenciaSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
   @override
   State<InterferenciaSim> createState() => _InterferenciaSimState();
@@ -86,6 +90,7 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
+      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
@@ -227,22 +232,14 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 6.0,
-                          boundaryMargin: const EdgeInsets.all(600),
-                          child: Container(
-                            color: const Color(0xFFF8FAFC), 
-                            child: CustomPaint(
-                              painter: WavePainter(
-                                tiempo: tiempo,
-                                a1: amp1, f1: freq1, k1: k1, p1: phi1, v1: vis1,
-                                a2: amp2, f2: freq2, k2: k2, p2: phi2, v2: vis2,
-                                vSuma: visSuma,
-                              ),
-                              child: Container(),
-                            ),
+                        child: ZoomableSimulationCanvas(
+                          controller: _transformationController,
+                          fondoPainter: const _FondoReglaInterferencia(),
+                          contenidoPainter: WavePainter(
+                            tiempo: tiempo,
+                            a1: amp1, f1: freq1, k1: k1, p1: phi1, v1: vis1,
+                            a2: amp2, f2: freq2, k2: k2, p2: phi2, v2: vis2,
+                            vSuma: visSuma,
                           ),
                         ),
                       ),
@@ -376,49 +373,43 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
   }
 }
 
-class WavePainter extends CustomPainter {
-  final double tiempo, a1, f1, k1, p1, a2, f2, k2, p2;
-  final bool v1, v2, vSuma;
-
-  WavePainter({
-    required this.tiempo,
-    required this.a1, required this.f1, required this.k1, required this.p1, required this.v1,
-    required this.a2, required this.f2, required this.k2, required this.p2, required this.v2,
-    required this.vSuma,
-  });
+/// Fondo FIJO con la cuadrícula y las reglas en cm/m. Se pinta en una
+/// capa aparte que nunca se transforma con el zoom/pan (ver
+/// [ZoomableSimulationCanvas]), así el "plano" de laboratorio siempre
+/// ocupa el mismo espacio en pantalla; solo las curvas de onda (dibujadas
+/// por [WavePainter]) se acercan o desplazan.
+class _FondoReglaInterferencia extends CustomPainter {
+  const _FondoReglaInterferencia();
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF8FAFC));
+
     final centroY = size.height / 2;
-    final w1 = 2 * math.pi * f1;
-    final w2 = 2 * math.pi * f2;
 
     // ---- CONSTANTES DE UNIDAD ACADÉMICA ----
-    // Definimos escalas de laboratorio:
-    // Vertical: Cada bloque principal de 50px equivale a 1.0 Centímetro (cm) en la física de la onda.
-    // Horizontal: Cada bloque principal de 50px equivale a 0.5 Metros (m) de recorrido espacial.
+    // Vertical: cada bloque principal de 50px equivale a 1.0 Centímetro (cm).
+    // Horizontal: cada bloque principal de 50px equivale a 0.5 Metros (m).
     const double pxPorBloque = 50.0;
-    const double pasoMalla = 10.0; 
+    const double pasoMalla = 10.0;
 
     final pinturaMallaFina = Paint()
-      ..color = Colors.indigo.withOpacity(0.03) 
+      ..color = Colors.indigo.withOpacity(0.03)
       ..strokeWidth = 0.5;
 
     final pinturaMallaPrincipal = Paint()
-      ..color = Colors.indigo.withOpacity(0.10) 
+      ..color = Colors.indigo.withOpacity(0.10)
       ..strokeWidth = 1.0;
 
-    // 1. Renderizado de líneas horizontales + Unidades en Eje Y (Amplitud en Centímetros: cm)
+    // 1. Líneas horizontales + Unidades en Eje Y (Amplitud en cm)
     for (double y = 0; y <= size.height; y += pasoMalla) {
       final esPrincipal = (y / pasoMalla) % 5 == 0;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
 
       if (esPrincipal) {
-        double deltaY = -(y - centroY); // Arriba es positivo
-        // Cada bloque de 50px = 1 cm -> Amplitud = deltaY / 50
+        double deltaY = -(y - centroY);
         double valorEnCentimetros = deltaY / pxPorBloque;
 
-        // Evitamos imprimir el "0.0 cm" varias veces para mantener limpio el centro
         if (valorEnCentimetros.abs() > 0.1) {
           final textPainter = TextPainter(
             text: TextSpan(
@@ -428,19 +419,17 @@ class WavePainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           );
           textPainter.layout();
-          textPainter.paint(canvas, Offset(8, y - 4)); // Pintado a la izquierda del canvas
+          textPainter.paint(canvas, Offset(8, y - 4));
         }
       }
     }
 
-    // 2. Renderizado de líneas verticales + Unidades en Eje X (Distancia en Metros: m)
+    // 2. Líneas verticales + Unidades en Eje X (Distancia en m)
     for (double x = 0; x <= size.width; x += pasoMalla) {
       final esPrincipal = (x / pasoMalla) % 5 == 0;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), esPrincipal ? pinturaMallaPrincipal : pinturaMallaFina);
 
-      // Imprimir escala horizontal en la parte inferior del canvas
       if (esPrincipal && x > 0 && x < size.width - 60) {
-        // Cada bloque de 50px = 0.5 metros -> Posición = (x / 50) * 0.5
         double valorEnMetros = (x / pxPorBloque) * 0.5;
 
         final textPainter = TextPainter(
@@ -460,8 +449,7 @@ class WavePainter extends CustomPainter {
       ..color = Colors.indigo.withOpacity(0.35)
       ..strokeWidth = 1.5;
     canvas.drawLine(Offset(0, centroY), Offset(size.width, centroY), pinturaEjeCentral);
-    
-    // Etiqueta del origen neutro
+
     final origenPainter = TextPainter(
       text: TextSpan(
         text: "0.0 cm/m",
@@ -471,7 +459,32 @@ class WavePainter extends CustomPainter {
     );
     origenPainter.layout();
     origenPainter.paint(canvas, Offset(8, centroY - 12));
+  }
 
+  @override
+  bool shouldRepaint(covariant _FondoReglaInterferencia oldDelegate) => false;
+}
+
+class WavePainter extends CustomPainter {
+  final double tiempo, a1, f1, k1, p1, a2, f2, k2, p2;
+  final bool v1, v2, vSuma;
+
+  WavePainter({
+    required this.tiempo,
+    required this.a1, required this.f1, required this.k1, required this.p1, required this.v1,
+    required this.a2, required this.f2, required this.k2, required this.p2, required this.v2,
+    required this.vSuma,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centroY = size.height / 2;
+    final w1 = 2 * math.pi * f1;
+    final w2 = 2 * math.pi * f2;
+
+    // NOTA: la cuadrícula, las reglas en cm/m y el eje central ahora
+    // viven en _FondoReglaInterferencia, una capa fija que nunca se
+    // transforma con el zoom/pan.
 
     // ---- GENERACIÓN DE VECTORES DE ONDA ----
     final path1 = Path();

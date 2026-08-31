@@ -39,6 +39,8 @@ dependencies:
   url_launcher: ^6.3.2
   google_fonts: ^8.1.0
   flutter_cube: ^0.1.1
+  pdf: ^3.13.0
+  printing: ^5.15.0
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +66,7 @@ flutter:
   
   assets:
     - assets/teoria/
+    - assets/fonts/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
