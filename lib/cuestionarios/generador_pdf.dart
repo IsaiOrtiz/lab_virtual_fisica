@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'modelo_captura.dart';
 import 'modelo_pregunta.dart';
 
 /// Genera un PDF por módulo con:
@@ -30,7 +31,7 @@ class GeneradorReportePdf {
     required String tituloModulo,
     required List<PreguntaCuestionario> preguntas,
     required Map<int, int?> respuestas,
-    required List<Uint8List> capturas,
+    required List<CapturaSimulacion> capturas,
   }) async {
     final bytes = await _construirBytes(
       tituloModulo: tituloModulo,
@@ -46,7 +47,7 @@ class GeneradorReportePdf {
     required String tituloModulo,
     required List<PreguntaCuestionario> preguntas,
     required Map<int, int?> respuestas,
-    required List<Uint8List> capturas,
+    required List<CapturaSimulacion> capturas,
   }) async {
     await _asegurarFuentes();
 
@@ -118,9 +119,11 @@ class GeneradorReportePdf {
       ),
     );
 
-    // Una página por cada captura, a tamaño grande.
+    // Una página por cada captura, a tamaño grande, con su interpretación
+    // (si el usuario escribió una) debajo de la imagen.
     for (int i = 0; i < capturas.length; i++) {
-      final imagen = pw.MemoryImage(capturas[i]);
+      final captura = capturas[i];
+      final imagen = pw.MemoryImage(captura.bytes);
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -131,6 +134,22 @@ class GeneradorReportePdf {
               pw.Text('Captura ${i + 1} de ${capturas.length} — $tituloModulo', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
               pw.SizedBox(height: 8),
               pw.Expanded(child: pw.Center(child: pw.Image(imagen, fit: pw.BoxFit.contain))),
+              if (captura.nota.trim().isNotEmpty) ...[
+                pw.SizedBox(height: 10),
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(6)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Interpretación del estudiante:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text(captura.nota.trim(), style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

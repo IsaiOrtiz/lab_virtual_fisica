@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter_markdown/flutter_markdown.dart'; // Requiere: flutter pub add flutter_markdown
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart'; // Ecuaciones LaTeX dentro del markdown de teoría
+import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart'; // Opcional para abrir links externos
 import 'package:google_fonts/google_fonts.dart';
 
 // CUESTIONARIO: modelo, banco de preguntas y pantalla del cuestionario/PDF
 import 'cuestionarios/banco_preguntas.dart';
 import 'cuestionarios/cuestionario_screen.dart';
+import 'cuestionarios/modelo_captura.dart';
 
 // IMPORTS DE TODAS LAS SIMULACIONES
 import 'simulaciones/refraccion.dart';
@@ -56,13 +59,13 @@ class ModuloData {
   // En lugar de un Widget fijo, usamos una función "constructora" que
   // recibe los callbacks para saltar a la pestaña de Teoría o de
   // Cuestionario, y una función para reportar cada captura de pantalla
-  // que el usuario tome dentro de la simulación (se usará luego para
-  // armar el PDF del cuestionario), y devuelve el widget de simulación
-  // ya configurado.
+  // (junto con la interpretación que el usuario escribió) que se tome
+  // dentro de la simulación (se usará luego para armar el PDF del
+  // cuestionario), y devuelve el widget de simulación ya configurado.
   final Widget Function(
     VoidCallback irATeoria,
     VoidCallback irACuestionario,
-    void Function(Uint8List bytes) onCapturar,
+    void Function(Uint8List bytes, String nota) onCapturar,
   ) construirSimulacion;
   final String categoria;
 
@@ -319,12 +322,13 @@ class _DetalleModuloState extends State<DetalleModulo> with SingleTickerProvider
   int _indiceActual = 0;
 
   // Capturas de pantalla que el usuario ha tomado en la simulación de
-  // este módulo (botón de cámara). Se acumulan aquí para poder incluirlas
-  // luego en el PDF que genera la pestaña de Cuestionario.
-  final List<Uint8List> _capturas = [];
+  // este módulo (botón de cámara), junto con la interpretación que
+  // escribió para cada una. Se acumulan aquí para poder incluirlas luego
+  // en el PDF que genera la pestaña de Cuestionario.
+  final List<CapturaSimulacion> _capturas = [];
 
-  void _registrarCaptura(Uint8List bytes) {
-    setState(() => _capturas.add(bytes));
+  void _registrarCaptura(Uint8List bytes, String nota) {
+    setState(() => _capturas.add(CapturaSimulacion(bytes: bytes, nota: nota)));
   }
 
   // Índice de la pestaña de Simulación dentro del TabBar (Teoría=0, Simulación=1, Test=2)
@@ -411,6 +415,17 @@ class _DetalleModuloState extends State<DetalleModulo> with SingleTickerProvider
       child: MarkdownBody(
         data: contenidoTeoria,
         imageDirectory: 'assets/imagenes',
+        // Habilita ecuaciones LaTeX dentro del markdown de teoría, tanto
+        // en línea ($E=mc^2$) como en bloque ($$f_n = n \cdot f_1$$).
+        extensionSet: md.ExtensionSet(
+          [LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
+          [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
+        ),
+        builders: {
+          'latex': LatexElementBuilder(
+            textStyle: GoogleFonts.lato(fontSize: 16, color: const Color(0xFF333333)),
+          ),
+        },
         styleSheet: MarkdownStyleSheet(
           p: GoogleFonts.lato(fontSize: 16, height: 1.6, color: const Color(0xFF333333)),
           h1: GoogleFonts.montserrat(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF1A237E), height: 1.8),

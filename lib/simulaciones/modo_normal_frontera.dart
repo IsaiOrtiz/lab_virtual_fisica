@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
 import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/fondo_regla_tubo.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Condición de frontera de la cuerda/columna vibrante.
@@ -31,7 +32,7 @@ class ModosNormalesFronteraSim extends StatefulWidget {
   final VoidCallback? onIrACuestionario;
   // Se llama con los bytes PNG cada vez que el usuario toma una
   // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
-  final void Function(Uint8List bytes)? onCapturar;
+  final void Function(Uint8List bytes, String nota)? onCapturar;
 
   const ModosNormalesFronteraSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
@@ -59,7 +60,9 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
   // --- Parámetros físicos de la cuerda ---
   double tension = 5.0;         // T, en Newtons (N)
   double densidadLineal = 30.0; // μ, en gramos por metro (g/m)
-  double longitudCuerda = 1.5;  // L, en metros (m)
+
+  // Longitud del tubo: ahora es FIJA (ya no tiene slider).
+  final double longitudCuerda = 1.5; // L, en metros (m) — fija
 
   /// Lista de armónicos válidos según la frontera elegida.
   List<int> get armonicosDisponibles {
@@ -153,47 +156,77 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
-      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
 
+        final TextEditingController notaController = TextEditingController();
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
               'Vista Previa de la Captura',
               style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(4),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: Image.memory(bytes),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: Image.memory(bytes),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Modo normal registrado con éxito.',
+                    style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Modo normal registrado con éxito.',
-                  style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notaController,
+                    maxLines: 3,
+                    style: GoogleFonts.lato(fontSize: 12),
+                    decoration: InputDecoration(
+                      labelText: 'Tu interpretación (opcional)',
+                      labelStyle: GoogleFonts.lato(fontSize: 11),
+                      hintText: 'Escribe qué observas en esta captura...',
+                      hintStyle: GoogleFonts.lato(fontSize: 11, color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cerrar',
-                  style: GoogleFonts.lato(fontWeight: FontWeight.bold, color: Colors.indigo[900]),
-                ),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                child: const Text('Descartar'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  widget.onCapturar?.call(bytes, notaController.text.trim());
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal[700], foregroundColor: Colors.white),
+                icon: const Icon(Icons.save_alt, size: 18),
+                label: const Text('Guardar'),
               ),
             ],
           ),
@@ -243,7 +276,7 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Modos Normales (fronteras mixtas/libres)",
+                                  "Modos Normales (tubo: fronteras mixtas/libres)",
                                   style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 const Divider(),
@@ -301,7 +334,8 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                                 _slider("A", amplitud, 5, ampMaxDinamica, (v) => setState(() => amplitud = v), decimales: 0),
                                 _slider("T", tension, 0.5, 20.0, (v) => setState(() => tension = v), decimales: 1, sufijo: " N"),
                                 _slider("μ", densidadLineal, 5.0, 100.0, (v) => setState(() => densidadLineal = v), decimales: 1, sufijo: " g/m"),
-                                _slider("L", longitudCuerda, 0.5, 3.0, (v) => setState(() => longitudCuerda = v), decimales: 2, sufijo: " m"),
+                                const SizedBox(height: 2),
+                                _buildDatoCalculado("Longitud (L, fija):", "${longitudCuerda.toStringAsFixed(2)} m"),
 
                                 const Divider(height: 20),
                                 CheckboxListTile(
@@ -355,7 +389,7 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                         key: _globalKeyCaptura,
                         child: ZoomableSimulationCanvas(
                           controller: _transformationController,
-                          colorFondo: const Color(0xFF1A1025), // Morado oscuro premium
+                          fondoPainter: FondoReglaTuboNormal(longitudFisica: longitudCuerda),
                           contenidoPainter: NormalModeFronteraPainter(
                             tiempo: tiempo,
                             amplitud: amplitud,
@@ -559,18 +593,15 @@ class NormalModeFronteraPainter extends CustomPainter {
 
     // ---- Forma instantánea de la cuerda ----
     final pathCuerda = Path();
-    double yIni = 0, yFin = 0;
     for (double xi = 0; xi <= largoCuerda; xi += 1) {
       final double x = margen + xi;
       final double y = amplitud * _formaEspacial(xi, largoCuerda) * cosT;
       if (xi == 0) {
-        yIni = y;
         pathCuerda.moveTo(x, centroY - y);
       } else {
         pathCuerda.lineTo(x, centroY - y);
       }
     }
-    yFin = amplitud * _formaEspacial(largoCuerda, largoCuerda) * cosT;
 
     final glowPaint = Paint()
       ..color = const Color(0xFFE040FB).withOpacity(0.25)
@@ -587,13 +618,27 @@ class NormalModeFronteraPainter extends CustomPainter {
         ..strokeWidth = 3.5,
     );
 
-    // ---- Extremos: fijo (soporte triangular) o libre (riel deslizante) ----
+    // ---- Tubo (reemplaza a la cuerda con soporte triangular / riel) ----
+    // Paredes horizontales, con la misma altura fija que el módulo de
+    // Modos Normales (fijo-fijo), para mantener consistencia visual.
+    final double medioAltoTubo = size.height * 0.42;
+    final double yTapaSup = centroY - medioAltoTubo;
+    final double yTapaInf = centroY + medioAltoTubo;
+
+    final paintParedTubo = Paint()
+      ..color = Colors.white.withOpacity(0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawLine(Offset(margen, yTapaSup), Offset(size.width - margen, yTapaSup), paintParedTubo);
+    canvas.drawLine(Offset(margen, yTapaInf), Offset(size.width - margen, yTapaInf), paintParedTubo);
+
+    // ---- Extremos: pared sólida (cerrado/fijo) o boca abierta (libre) ----
     if (condicion == CondicionFrontera.fijoAbierto) {
-      _dibujarSoporteFijo(canvas, Offset(margen, centroY));
-      _dibujarExtremoLibre(canvas, Offset(size.width - margen, centroY), centroY - yFin);
+      _dibujarTapaCerrada(canvas, margen, yTapaSup, yTapaInf);
+      _dibujarBocaAbierta(canvas, size.width - margen, yTapaSup, yTapaInf, esIzquierda: false);
     } else {
-      _dibujarExtremoLibre(canvas, Offset(margen, centroY), centroY - yIni);
-      _dibujarExtremoLibre(canvas, Offset(size.width - margen, centroY), centroY - yFin);
+      _dibujarBocaAbierta(canvas, margen, yTapaSup, yTapaInf, esIzquierda: true);
+      _dibujarBocaAbierta(canvas, size.width - margen, yTapaSup, yTapaInf, esIzquierda: false);
     }
 
     // ---- Nodos y antinodos ----
@@ -649,40 +694,50 @@ class NormalModeFronteraPainter extends CustomPainter {
     etiqueta.paint(canvas, Offset(margen, 10));
   }
 
-  void _dibujarSoporteFijo(Canvas canvas, Offset punto) {
-    final Path triangulo = Path()
-      ..moveTo(punto.dx, punto.dy)
-      ..lineTo(punto.dx - 8, punto.dy + 14)
-      ..lineTo(punto.dx + 8, punto.dy + 14)
-      ..close();
-    canvas.drawPath(triangulo, Paint()..color = Colors.white70);
+  /// Dibuja la pared sólida de un extremo CERRADO/FIJO del tubo: una
+  /// línea vertical gruesa que une las dos paredes horizontales.
+  void _dibujarTapaCerrada(Canvas canvas, double x, double yTop, double yBot) {
     canvas.drawLine(
-      Offset(punto.dx - 12, punto.dy + 14),
-      Offset(punto.dx + 12, punto.dy + 14),
-      Paint()..color = Colors.white70..strokeWidth = 2,
+      Offset(x, yTop),
+      Offset(x, yBot),
+      Paint()
+        ..color = Colors.white.withOpacity(0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.0,
     );
   }
 
-  /// Dibuja un extremo LIBRE: un pequeño riel vertical (dos líneas
-  /// paralelas) por el que se desliza un anillo situado en la posición
-  /// vertical instantánea del extremo de la cuerda (yActual), indicando
-  /// que ese punto puede moverse libremente (antinodo obligado).
-  void _dibujarExtremoLibre(Canvas canvas, Offset punto, double yActual) {
-    final paintRiel = Paint()
-      ..color = Colors.white54
-      ..strokeWidth = 2;
-    canvas.drawLine(Offset(punto.dx - 6, punto.dy - 34), Offset(punto.dx - 6, punto.dy + 34), paintRiel);
-    canvas.drawLine(Offset(punto.dx + 6, punto.dy - 34), Offset(punto.dx + 6, punto.dy + 34), paintRiel);
+  /// Dibuja la boca de un extremo ABIERTO/LIBRE del tubo: las paredes se
+  /// abren levemente hacia afuera (en vez de cerrarse con una tapa), y
+  /// unos arcos concéntricos sugieren la presión escapando hacia el
+  /// exterior — la representación física real de un extremo abierto.
+  void _dibujarBocaAbierta(Canvas canvas, double x, double yTop, double yBot, {required bool esIzquierda}) {
+    const double flare = 14.0;
+    final double dx = esIzquierda ? -flare : flare;
 
-    canvas.drawCircle(Offset(punto.dx, yActual), 6.0, Paint()..color = const Color(0xFF4FC3F7));
-    canvas.drawCircle(
-      Offset(punto.dx, yActual),
-      6.0,
-      Paint()
-        ..color = Colors.white70
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
-    );
+    final paintBorde = Paint()
+      ..color = Colors.white.withOpacity(0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawLine(Offset(x, yTop), Offset(x + dx, yTop - 6), paintBorde);
+    canvas.drawLine(Offset(x, yBot), Offset(x + dx, yBot + 6), paintBorde);
+
+    final double centroYBoca = (yTop + yBot) / 2;
+    final double anguloCentro = esIzquierda ? math.pi : 0;
+    final paintOnda = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    for (int i = 1; i <= 3; i++) {
+      final double radio = 8.0 * i;
+      canvas.drawArc(
+        Rect.fromCenter(center: Offset(x, centroYBoca), width: radio * 2, height: radio * 2),
+        anguloCentro - math.pi / 3,
+        math.pi * 2 / 3,
+        false,
+        paintOnda,
+      );
+    }
   }
 
   void _dibujarLineaPunteada(Canvas canvas, Path path, Paint paint, {double dashWidth = 5, double gapWidth = 4}) {

@@ -56,3 +56,16 @@ nodos.
 - Abierto-Abierto: es el comportamiento de un **tubo abierto en ambos
   extremos** (como una flauta), o de una cuerda cuyos dos extremos pueden
   deslizarse libremente en un riel sin fricción.
+
+## Notación con LaTeX
+
+Las fórmulas de esta página ya se escriben con sintaxis LaTeX, que ahora
+se renderiza directamente en la app. Para escribir una fracción se usa
+`\frac{numerador}{denominador}`; por ejemplo, la frecuencia del modo
+fijo-abierto en línea se escribe como $f_k = \frac{k \cdot v}{4L}$, y
+como bloque centrado se ve así:
+
+$$f_k = \frac{k \cdot v}{4L}$$
+
+Usa `$...$` para ecuaciones dentro del texto y `$$...$$` en su propia
+línea para ecuaciones destacadas.

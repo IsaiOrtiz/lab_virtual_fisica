@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
 import '../widgets/zoom_pan_controls.dart';
 import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/fondo_regla_tubo.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Simulación de Modos Normales de vibración de una cuerda fija en
@@ -20,7 +21,7 @@ class ModosNormalesSim extends StatefulWidget {
   final VoidCallback? onIrACuestionario;
   // Se llama con los bytes PNG cada vez que el usuario toma una
   // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
-  final void Function(Uint8List bytes)? onCapturar;
+  final void Function(Uint8List bytes, String nota)? onCapturar;
 
   const ModosNormalesSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
@@ -46,7 +47,11 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
   // --- Parámetros físicos de la cuerda ---
   double tension = 5.0;        // T, en Newtons (N)
   double densidadLineal = 30.0; // μ, en gramos por metro (g/m)
-  double longitudCuerda = 1.5;  // L, en metros (m)
+
+  // Longitud del tubo/cuerda: ahora es FIJA (ya no tiene slider). Se deja
+  // como campo (no "static const") por si más adelante se quiere variar
+  // por módulo, pero el usuario ya no puede modificarla desde la UI.
+  final double longitudCuerda = 1.5; // L, en metros (m) — fija
 
   static const int modoMaximo = 6;
 
@@ -100,47 +105,77 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
-      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
 
+        final TextEditingController notaController = TextEditingController();
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
               'Vista Previa de la Captura',
               style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(4),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: Image.memory(bytes),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: Image.memory(bytes),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Modo normal registrado con éxito.',
+                    style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Modo normal registrado con éxito.',
-                  style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notaController,
+                    maxLines: 3,
+                    style: GoogleFonts.lato(fontSize: 12),
+                    decoration: InputDecoration(
+                      labelText: 'Tu interpretación (opcional)',
+                      labelStyle: GoogleFonts.lato(fontSize: 11),
+                      hintText: 'Escribe qué observas en esta captura...',
+                      hintStyle: GoogleFonts.lato(fontSize: 11, color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cerrar',
-                  style: GoogleFonts.lato(fontWeight: FontWeight.bold, color: Colors.indigo[900]),
-                ),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                child: const Text('Descartar'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  widget.onCapturar?.call(bytes, notaController.text.trim());
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal[700], foregroundColor: Colors.white),
+                icon: const Icon(Icons.save_alt, size: 18),
+                label: const Text('Guardar'),
               ),
             ],
           ),
@@ -190,7 +225,7 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Modos Normales (cuerda fija-fija)",
+                                  "Modos Normales (tubo cerrado-cerrado)",
                                   style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 const Divider(),
@@ -217,14 +252,15 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
 
                                 const Divider(height: 24),
                                 Text(
-                                  "Propiedades físicas de la cuerda",
+                                  "Propiedades físicas del tubo",
                                   style: GoogleFonts.lato(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
                                 ),
                                 const SizedBox(height: 6),
                                 _slider("A", amplitud, 5, ampMaxDinamica, (v) => setState(() => amplitud = v), decimales: 0),
                                 _slider("T", tension, 0.5, 20.0, (v) => setState(() => tension = v), decimales: 1, sufijo: " N"),
                                 _slider("μ", densidadLineal, 5.0, 100.0, (v) => setState(() => densidadLineal = v), decimales: 1, sufijo: " g/m"),
-                                _slider("L", longitudCuerda, 0.5, 3.0, (v) => setState(() => longitudCuerda = v), decimales: 2, sufijo: " m"),
+                                const SizedBox(height: 2),
+                                _buildDatoCalculado("Longitud (L, fija):", "${longitudCuerda.toStringAsFixed(2)} m"),
 
                                 const Divider(height: 20),
                                 CheckboxListTile(
@@ -268,7 +304,7 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                         key: _globalKeyCaptura,
                         child: ZoomableSimulationCanvas(
                           controller: _transformationController,
-                          colorFondo: const Color(0xFF1A1025), // Morado oscuro premium
+                          fondoPainter: FondoReglaTuboNormal(longitudFisica: longitudCuerda),
                           contenidoPainter: NormalModePainter(
                             tiempo: tiempo,
                             amplitud: amplitud,
@@ -483,9 +519,30 @@ class NormalModePainter extends CustomPainter {
         ..strokeWidth = 3.5,
     );
 
-    // ---- Soportes fijos en los extremos ----
-    _dibujarSoporteFijo(canvas, Offset(margen, centroY));
-    _dibujarSoporteFijo(canvas, Offset(size.width - margen, centroY));
+    // ---- Tubo cerrado-cerrado (reemplaza a la cuerda con "conitos") ----
+    // Paredes horizontales del tubo: su altura se calcula a partir del
+    // tamaño del canvas (no de la amplitud), así el tubo se ve como un
+    // contenedor fijo y solo la onda interior cambia con los parámetros.
+    final double medioAltoTubo = size.height * 0.42;
+    final double yTapaSup = centroY - medioAltoTubo;
+    final double yTapaInf = centroY + medioAltoTubo;
+
+    final paintParedTubo = Paint()
+      ..color = Colors.white.withOpacity(0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawLine(Offset(margen, yTapaSup), Offset(size.width - margen, yTapaSup), paintParedTubo);
+    canvas.drawLine(Offset(margen, yTapaInf), Offset(size.width - margen, yTapaInf), paintParedTubo);
+
+    // Tapas de los extremos: paredes verticales sólidas, indicando que
+    // AMBOS extremos están cerrados (equivalente físico de un extremo
+    // fijo en la cuerda).
+    final paintTapaExtremo = Paint()
+      ..color = Colors.white.withOpacity(0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0;
+    canvas.drawLine(Offset(margen, yTapaSup), Offset(margen, yTapaInf), paintTapaExtremo);
+    canvas.drawLine(Offset(size.width - margen, yTapaSup), Offset(size.width - margen, yTapaInf), paintTapaExtremo);
 
     // ---- Nodos y antinodos ----
     if (mostrarNodos) {
@@ -525,20 +582,6 @@ class NormalModePainter extends CustomPainter {
     );
     etiqueta.layout();
     etiqueta.paint(canvas, Offset(margen, 10));
-  }
-
-  void _dibujarSoporteFijo(Canvas canvas, Offset punto) {
-    final Path triangulo = Path()
-      ..moveTo(punto.dx, punto.dy)
-      ..lineTo(punto.dx - 8, punto.dy + 14)
-      ..lineTo(punto.dx + 8, punto.dy + 14)
-      ..close();
-    canvas.drawPath(triangulo, Paint()..color = Colors.white70);
-    canvas.drawLine(
-      Offset(punto.dx - 12, punto.dy + 14),
-      Offset(punto.dx + 12, punto.dy + 14),
-      Paint()..color = Colors.white70..strokeWidth = 2,
-    );
   }
 
   void _dibujarLineaPunteada(Canvas canvas, Path path, Paint paint, {double dashWidth = 5, double gapWidth = 4}) {

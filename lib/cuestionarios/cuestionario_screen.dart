@@ -1,9 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'generador_pdf.dart';
+import 'modelo_captura.dart';
 import 'modelo_pregunta.dart';
 
 /// Pantalla de cuestionario para un módulo: muestra las preguntas de
@@ -12,7 +11,7 @@ import 'modelo_pregunta.dart';
 class CuestionarioScreen extends StatefulWidget {
   final String tituloModulo;
   final List<PreguntaCuestionario> preguntas;
-  final List<Uint8List> capturas;
+  final List<CapturaSimulacion> capturas;
 
   const CuestionarioScreen({
     super.key,

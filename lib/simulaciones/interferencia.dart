@@ -14,7 +14,7 @@ class InterferenciaSim extends StatefulWidget {
   final VoidCallback? onIrACuestionario;
   // Se llama con los bytes PNG cada vez que el usuario toma una
   // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
-  final void Function(Uint8List bytes)? onCapturar;
+  final void Function(Uint8List bytes, String nota)? onCapturar;
 
   const InterferenciaSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
 
@@ -90,55 +90,84 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData?.buffer.asUint8List();
-      if (bytes != null) widget.onCapturar?.call(bytes);
 
       if (bytes != null) {
         if (!mounted) return;
+
+        final TextEditingController notaController = TextEditingController();
 
         // --- AQUÍ SE COLOCA EL POP-UP PARA VER LA IMAGEN ---
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
-              'Vista Previa de la Captura', 
-              style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold)
+              'Vista Previa de la Captura',
+              style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Este widget decodifica los bytes y los muestra en la pantalla de PC o Móvil
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(4),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Este widget decodifica los bytes y los muestra en la pantalla de PC o Móvil
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: Image.memory(bytes),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: Image.memory(bytes),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Unidades e interferencia registradas con éxito.',
+                    style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Unidades e interferencia registradas con éxito.', 
-                  style: GoogleFonts.lato(fontSize: 11, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notaController,
+                    maxLines: 3,
+                    style: GoogleFonts.lato(fontSize: 12),
+                    decoration: InputDecoration(
+                      labelText: 'Tu interpretación (opcional)',
+                      labelStyle: GoogleFonts.lato(fontSize: 11),
+                      hintText: 'Escribe qué observas en esta captura...',
+                      hintStyle: GoogleFonts.lato(fontSize: 11, color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cerrar', 
-                  style: GoogleFonts.lato(fontWeight: FontWeight.bold, color: Colors.indigo[900]),
-                ),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                child: const Text('Descartar'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  widget.onCapturar?.call(bytes, notaController.text.trim());
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal[700], foregroundColor: Colors.white),
+                icon: const Icon(Icons.save_alt, size: 18),
+                label: const Text('Guardar'),
               ),
             ],
           ),
         );
         // ---------------------------------------------------
-
       }
     } catch (e) {
       debugPrint("Error al exportar captura: $e");
