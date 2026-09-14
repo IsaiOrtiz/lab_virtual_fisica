@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/rendering.dart'; // Necesario para la captura de pantalla (RenderRepaintBoundary)
+import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
-import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
+import 'dart:ui' as ui;
 import '../widgets/zoom_pan_controls.dart';
 import '../widgets/zoomable_simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
@@ -12,8 +12,6 @@ import '../widgets/navegacion_simulacion.dart';
 class OndaViajeraSim extends StatefulWidget {
   final VoidCallback? onIrATeoria;
   final VoidCallback? onIrACuestionario;
-  // Se llama con los bytes PNG cada vez que el usuario toma una
-  // captura, para que el módulo de Cuestionario pueda incluirla en el PDF.
   final void Function(Uint8List bytes, String nota)? onCapturar;
 
   const OndaViajeraSim({super.key, this.onIrATeoria, this.onIrACuestionario, this.onCapturar});
@@ -26,31 +24,25 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
   double tiempo = 0.0;
   Timer? _timer;
   bool _mostrarControles = true;
-  bool _estaCorriendo = true; // Estado de la animación (Pausa/Play)
+  bool _estaCorriendo = true;
 
-  // Llave global para capturar la pantalla de la simulación de forma aislada
   final GlobalKey _globalKeyCaptura = GlobalKey();
-
-  // Controlador de transformación para Zoom y Pan (desplazamiento) táctil/con botones
   final TransformationController _transformationController = TransformationController();
 
-  // Parámetros de la Onda Única
   double amplitud = 40.0;
   double frecuencia = 1.0;
-  double k = 0.03;      // Número de onda
-  double phi = 0.0;     // Fase inicial
-  bool derecha = true;  // Dirección de movimiento (+x o -x)
+  double k = 0.03;
+  double phi = 0.0;
+  bool derecha = true;
 
   @override
   void initState() {
     super.initState();
-    // Forzar modo horizontal al entrar
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
 
-    // Timer para la animación continua (aprox 60 FPS)
     _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       if (_estaCorriendo) {
         setState(() {
@@ -71,7 +63,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
     super.dispose();
   }
 
-  // Función asíncrona encargada de renderizar y procesar la captura de la simulación
   Future<void> _capturarSimulacion() async {
     try {
       RenderRepaintBoundary? boundary = _globalKeyCaptura.currentContext?.findRenderObject() as RenderRepaintBoundary?;
@@ -179,17 +170,13 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
             final altoDisponible = constraints.maxHeight;
             final ampMaxDinamica = (altoDisponible / 2) - 15;
 
-            // Corrección de rango dinámico preventivo
             if (amplitud > ampMaxDinamica) amplitud = ampMaxDinamica;
 
-            // Tamaño real del área de dibujo (sin contar el panel lateral),
-            // usado para centrar el zoom con los botones.
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
             final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
-                // PANEL DE CONTROLES COLAPSABLE CON ANIMACIÓN
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeInOut,
@@ -221,7 +208,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                                 ),
                                 const SizedBox(height: 4),
 
-                                // Selector de dirección estilizado
                                 Row(
                                   children: [
                                     Expanded(
@@ -247,7 +233,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                                 ),
 
                                 const Divider(height: 24),
-                                // Datos calculados en tiempo real (Útil para el laboratorio)
                                 _buildDatoCalculado("Longitud de onda (λ):", "${(2 * math.pi / k).toStringAsFixed(1)} px"),
                                 _buildDatoCalculado("Periodo (T):", "${(1 / frecuencia).toStringAsFixed(2)} s"),
                                 _buildDatoCalculado("Velocidad de fase (v):", "${((2 * math.pi * frecuencia) / k).toStringAsFixed(1)} px/s"),
@@ -258,28 +243,36 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                       : const SizedBox.shrink(),
                 ),
 
-                // ÁREA DE SIMULACIÓN + CONTROLES MULTIMEDIA FLOTANTES
                 Expanded(
                   child: Stack(
                     children: [
-                      // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
-                          colorFondo: const Color(0xFF0D1117), // Fondo oscuro estilo osciloscopio
-                          contenidoPainter: SingleWavePainter(
-                            tiempo: tiempo,
-                            amplitud: amplitud,
-                            frecuencia: frecuencia,
-                            k: k,
-                            phi: phi,
-                            haciaDerecha: derecha,
-                          ),
+                        child: Stack(
+                          children: [
+                            // 1. Capa de fondo fija con cuadrícula blanca centrada y a escala
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: FondoCuadriculaPainter(k: k),
+                              ),
+                            ),
+                            // 2. Capa de la onda con zoom y desplazamiento
+                            ZoomableSimulationCanvas(
+                              controller: _transformationController,
+                              colorFondo: Colors.transparent, // Transparente para ver el fondo blanco debajo
+                              contenidoPainter: SingleWavePainter(
+                                tiempo: tiempo,
+                                amplitud: amplitud,
+                                frecuencia: frecuencia,
+                                k: k,
+                                phi: phi,
+                                haciaDerecha: derecha,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
-                      // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
                       Positioned(
                         top: 16,
                         right: 16,
@@ -289,7 +282,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                         ),
                       ),
 
-                      // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(
                         top: 16,
                         left: 16,
@@ -299,7 +291,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                         ),
                       ),
 
-                      // BOTONERA DE CONTROL FLOTANTE (Abajo a la izquierda)
                       Positioned(
                         bottom: 16,
                         left: 16,
@@ -313,7 +304,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                               child: Icon(_mostrarControles ? Icons.fullscreen : Icons.fullscreen_exit),
                             ),
                             const SizedBox(width: 10),
-
                             FloatingActionButton.small(
                               heroTag: "btnPausaOnda",
                               backgroundColor: _estaCorriendo ? Colors.amber[700] : Colors.green[700],
@@ -322,7 +312,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                               child: Icon(_estaCorriendo ? Icons.pause : Icons.play_arrow),
                             ),
                             const SizedBox(width: 10),
-
                             FloatingActionButton.small(
                               heroTag: "btnCapturaOnda",
                               backgroundColor: Colors.teal[700],
@@ -394,6 +383,65 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
   }
 }
 
+// Pintor dedicado para la cuadrícula blanca, centrada y escalada de forma proporcional
+class FondoCuadriculaPainter extends CustomPainter {
+  final double k;
+
+  FondoCuadriculaPainter({required this.k});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Fondo completamente blanco
+    final fondoPaint = Paint()..color = Colors.white;
+    canvas.drawRect(Offset.zero & size, fondoPaint);
+
+    final centroX = size.width / 2;
+    final centroY = size.height / 2;
+
+    // Escala basada en el número de onda k para que las divisiones coincidan armónicamente
+    final double espaciadoGrid = (2 * math.pi / k) / 4; 
+
+    final lineaSecundariaPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.15)
+      ..strokeWidth = 1.0;
+
+    final lineaPrincipalPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.35)
+      ..strokeWidth = 1.5;
+
+    // Dibujar líneas verticales centradas
+    double x = centroX;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), lineaSecundariaPaint);
+      x += espaciadoGrid;
+    }
+    x = centroX - espaciadoGrid;
+    while (x > 0) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), lineaSecundariaPaint);
+      x -= espaciadoGrid;
+    }
+
+    // Dibujar líneas horizontales centradas
+    double y = centroY;
+    while (y < size.height) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), lineaSecundariaPaint);
+      y += espaciadoGrid;
+    }
+    y = centroY - espaciadoGrid;
+    while (y > 0) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), lineaSecundariaPaint);
+      y -= espaciadoGrid;
+    }
+
+    // Ejes principales X e Y pasando estrictamente por el centro
+    canvas.drawLine(Offset(0, centroY), Offset(size.width, centroY), lineaPrincipalPaint);
+    canvas.drawLine(Offset(centroX, 0), Offset(centroX, size.height), lineaPrincipalPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant FondoCuadriculaPainter oldDelegate) => oldDelegate.k != k;
+}
+
 class SingleWavePainter extends CustomPainter {
   final double tiempo, amplitud, frecuencia, k, phi;
   final bool haciaDerecha;
@@ -410,26 +458,11 @@ class SingleWavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centroY = size.height / 2;
-    final w = 2 * math.pi * frecuencia; // Frecuencia angular (omega)
-
-    // NOTA: la cuadrícula de fondo (y sus etiquetas de amplitud) ahora
-    // vive en una capa fija aparte (FondoCuadriculaPainter) que nunca se
-    // transforma, así el "plano" siempre ocupa el mismo espacio en
-    // pantalla y solo la onda hace zoom/pan.
-
-    // Línea de referencia central (Eje X)
-    final ejePaint = Paint()
-      ..color = Colors.white.withOpacity(0.18)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    canvas.drawLine(Offset(0, centroY), Offset(size.width, centroY), ejePaint);
+    final w = 2 * math.pi * frecuencia;
 
     final path = Path();
 
     for (double x = 0; x <= size.width; x++) {
-      // Física del cambio de dirección:
-      // Hacia la derecha (+x): kx - wt
-      // Hacia la izquierda (-x): kx + wt
       double argumentoTerminoTemporal = haciaDerecha ? (tiempo * w) : -(tiempo * w);
       double y = amplitud * math.sin(k * x - argumentoTerminoTemporal + phi);
 
@@ -440,29 +473,28 @@ class SingleWavePainter extends CustomPainter {
       }
     }
 
-    // Resplandor sutil detrás de la onda para mejorar la lectura visual
+    // Resplandor ajustado para fondo claro (tono verdoso oscuro/azulado con menor opacidad)
     final glowPaint = Paint()
-      ..color = const Color(0xFF00E676).withOpacity(0.25)
+      ..color = const Color(0xFF00796B).withOpacity(0.15)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 8.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..strokeWidth = 6.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawPath(path, glowPaint);
 
     final wavePaint = Paint()
-      ..color = const Color(0xFF00E676) // Verde brillante tipo fósforo de osciloscopio
+      ..color = const Color(0xFF00796B) // Teal oscuro para destacar sobre fondo blanco
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
     canvas.drawPath(path, wavePaint);
 
-    // Punto guía sobre la onda en el centro para reforzar el sentido de movimiento
     if (size.width > 0) {
       double argumentoTerminoTemporal = haciaDerecha ? (tiempo * w) : -(tiempo * w);
       double yGuia = amplitud * math.sin(k * (size.width * 0.5) - argumentoTerminoTemporal + phi);
       canvas.drawCircle(
         Offset(size.width * 0.5, centroY + yGuia),
         4.5,
-        Paint()..color = Colors.white,
+        Paint()..color = Colors.redAccent,
       );
     }
   }

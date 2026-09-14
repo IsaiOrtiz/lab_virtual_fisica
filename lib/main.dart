@@ -125,13 +125,13 @@ class MenuPrincipal extends StatelessWidget {
       ModuloData(
         titulo: 'Reflexión de la Luz',
         archivoTeoria: 'assets/teoria/reflexion.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => ReflexionLuzSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Óptica',
       ),
       ModuloData(
         titulo: 'Refracción de la Luz',
         archivoTeoria: 'assets/teoria/refraccion.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => RefraccionLuzSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Óptica',
       ),
       ModuloData(
