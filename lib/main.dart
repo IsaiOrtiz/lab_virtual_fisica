@@ -137,7 +137,7 @@ class MenuPrincipal extends StatelessWidget {
       ModuloData(
         titulo: 'Espejos Curvos',
         archivoTeoria: 'assets/teoria/espejos.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => EspejoCurvoSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Óptica',
       ),
       ModuloData(

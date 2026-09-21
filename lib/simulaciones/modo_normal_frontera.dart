@@ -769,7 +769,7 @@ class NormalModeFronteraPainter extends CustomPainter {
         final double siguiente = distancia + (dibujar ? dashWidth : gapWidth);
         if (dibujar) {
           final double fin = math.min(siguiente, metric.length);
-          final extracto = metric.extractPath(distancia, fin);f
+          final extracto = metric.extractPath(distancia, fin);
           canvas.drawPath(extracto, paint);
         }
         distancia = siguiente;
