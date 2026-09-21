@@ -8,10 +8,14 @@ import 'modelo_captura.dart';
 import 'modelo_pregunta.dart';
 
 /// Genera un PDF por módulo con:
-///  1. El resultado del cuestionario (puntaje + cada pregunta con la
+///  1. Una página por cada captura de pantalla que el usuario tomó en la
+///     simulación de ese módulo (con su interpretación, si escribió una).
+///  2. El resultado del cuestionario (puntaje + cada pregunta con la
 ///     respuesta elegida, la correcta y su explicación).
-///  2. Una página por cada captura de pantalla que el usuario tomó en la
-///     simulación de ese módulo.
+///
+/// Las capturas van primero porque son el registro de lo que el
+/// estudiante observó durante la simulación; el cuestionario, que
+/// evalúa esa observación, se presenta después.
 ///
 /// Usa la fuente Noto Sans embebida en assets/fonts para que los acentos
 /// y la "ñ" se vean correctamente (las fuentes base de la librería `pdf`
@@ -67,60 +71,10 @@ class GeneradorReportePdf {
         "${ahora.day.toString().padLeft(2, '0')}/${ahora.month.toString().padLeft(2, '0')}/${ahora.year} "
         "${ahora.hour.toString().padLeft(2, '0')}:${ahora.minute.toString().padLeft(2, '0')}";
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        header: (context) {
-          if (context.pageNumber > 1) return pw.SizedBox();
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('Laboratorio Virtual de Física', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
-              pw.SizedBox(height: 2),
-              pw.Text(tituloModulo, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Text('Generado el $fechaTexto', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-              pw.SizedBox(height: 8),
-              pw.Divider(color: PdfColors.grey400),
-            ],
-          );
-        },
-        footer: (context) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text('Página ${context.pageNumber} de ${context.pagesCount}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500)),
-        ),
-        build: (context) => [
-          if (total > 0) ...[
-            pw.Container(
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(color: PdfColors.indigo50, borderRadius: pw.BorderRadius.circular(8)),
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Resultado del cuestionario', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text(
-                    '$correctas / $total   (${porcentaje.toStringAsFixed(0)}%)',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900),
-                  ),
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 16),
-            for (int i = 0; i < preguntas.length; i++) _bloquePregunta(i, preguntas[i], respuestas[i]),
-          ] else
-            pw.Text('Este módulo todavía no tiene preguntas configuradas.', style: const pw.TextStyle(color: PdfColors.grey700)),
-          if (capturas.isNotEmpty) ...[
-            pw.SizedBox(height: 12),
-            pw.Text('Este reporte incluye ${capturas.length} captura(s) de la simulación en las páginas siguientes.',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-          ],
-        ],
-      ),
-    );
-
-    // Una página por cada captura, a tamaño grande, con su interpretación
-    // (si el usuario escribió una) debajo de la imagen.
+    // --- 1) Una página por cada captura, a tamaño grande, con su
+    //        interpretación (si el usuario escribió una) debajo de la
+    //        imagen. El encabezado del reporte (título del módulo y
+    //        fecha) se muestra solo una vez, en la primera captura.
     for (int i = 0; i < capturas.length; i++) {
       final captura = capturas[i];
       final imagen = pw.MemoryImage(captura.bytes);
@@ -128,9 +82,13 @@ class GeneradorReportePdf {
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
+          // pw.Page no tiene parámetros header/footer (esos solo existen
+          // en pw.MultiPage), así que los incorporamos como parte del
+          // propio contenido de la página.
           build: (context) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              if (i == 0) _encabezado(tituloModulo, fechaTexto),
               pw.Text('Captura ${i + 1} de ${capturas.length} — $tituloModulo', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
               pw.SizedBox(height: 8),
               pw.Expanded(child: pw.Center(child: pw.Image(imagen, fit: pw.BoxFit.contain))),
@@ -156,8 +114,73 @@ class GeneradorReportePdf {
       );
     }
 
+    // --- 2) Resultado del cuestionario. Si no hubo capturas, esta
+    //        sección es la primera del documento y muestra el
+    //        encabezado; si ya hubo capturas antes, el encabezado no se
+    //        repite (context.pageNumber solo vale 1 cuando esta es la
+    //        primera página de todo el documento).
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => capturas.isEmpty && context.pageNumber == 1 ? _encabezado(tituloModulo, fechaTexto) : pw.SizedBox(),
+        footer: (context) => _pie(context),
+        build: (context) => [
+          if (capturas.isNotEmpty) ...[
+            pw.Text(
+              'Cuestionario — $tituloModulo',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Las ${capturas.length} captura(s) de la simulación se muestran en las páginas anteriores de este reporte.',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+            ),
+            pw.SizedBox(height: 12),
+          ],
+          if (total > 0) ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(color: PdfColors.indigo50, borderRadius: pw.BorderRadius.circular(8)),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Resultado del cuestionario', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    '$correctas / $total   (${porcentaje.toStringAsFixed(0)}%)',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 16),
+            for (int i = 0; i < preguntas.length; i++) _bloquePregunta(i, preguntas[i], respuestas[i]),
+          ] else
+            pw.Text('Este módulo todavía no tiene preguntas configuradas.', style: const pw.TextStyle(color: PdfColors.grey700)),
+        ],
+      ),
+    );
+
     return pdf.save();
   }
+
+  static pw.Widget _encabezado(String tituloModulo, String fechaTexto) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text('Laboratorio Virtual de Física', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+          pw.SizedBox(height: 2),
+          pw.Text(tituloModulo, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 4),
+          pw.Text('Generado el $fechaTexto', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+          pw.SizedBox(height: 8),
+          pw.Divider(color: PdfColors.grey400),
+        ],
+      );
+
+  static pw.Widget _pie(pw.Context context) => pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text('Página ${context.pageNumber} de ${context.pagesCount}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500)),
+      );
 
   static pw.Widget _bloquePregunta(int indice, PreguntaCuestionario p, int? elegida) {
     final bool contestada = elegida != null;

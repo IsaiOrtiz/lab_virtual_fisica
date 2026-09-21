@@ -160,10 +160,19 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
       if (bytes != null) {
         if (!mounted) return;
 
+        // Pausamos la simulación mientras se revisa la captura: si sigue
+        // corriendo y redibujando en segundo plano, el diálogo se siente
+        // como si "pasara muy rápido" y no da tiempo de escribir la nota.
+        final bool estabaCorriendoAntesDeCapturar = _estaCorriendo;
+        if (_estaCorriendo) {
+          setState(() => _estaCorriendo = false);
+        }
+
         final TextEditingController notaController = TextEditingController();
 
-        showDialog(
+        await showDialog<void>(
           context: context,
+          barrierDismissible: false,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
@@ -193,6 +202,7 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: notaController,
+                    autofocus: true,
                     maxLines: 3,
                     style: GoogleFonts.lato(fontSize: 12),
                     decoration: InputDecoration(
@@ -231,6 +241,10 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
             ],
           ),
         );
+
+        if (mounted && estabaCorriendoAntesDeCapturar) {
+          setState(() => _estaCorriendo = true);
+        }
       }
     } catch (e) {
       debugPrint("Error al exportar captura: $e");
@@ -619,9 +633,13 @@ class NormalModeFronteraPainter extends CustomPainter {
     );
 
     // ---- Tubo (reemplaza a la cuerda con soporte triangular / riel) ----
-    // Paredes horizontales, con la misma altura fija que el módulo de
-    // Modos Normales (fijo-fijo), para mantener consistencia visual.
-    final double medioAltoTubo = size.height * 0.42;
+    // Paredes horizontales: su altura ya NO es un porcentaje fijo del
+    // canvas, sino que se ajusta a la amplitud máxima de la onda (con un
+    // pequeño margen de aire), igual que en Modos Normales (fijo-fijo).
+    const double margenTuboSobreAmplitud = 22.0;
+    final double medioAltoMaximo = size.height / 2 - 6;
+    double medioAltoTubo = amplitud + margenTuboSobreAmplitud;
+    if (medioAltoTubo > medioAltoMaximo) medioAltoTubo = medioAltoMaximo;
     final double yTapaSup = centroY - medioAltoTubo;
     final double yTapaInf = centroY + medioAltoTubo;
 
@@ -709,8 +727,8 @@ class NormalModeFronteraPainter extends CustomPainter {
 
   /// Dibuja la boca de un extremo ABIERTO/LIBRE del tubo: las paredes se
   /// abren levemente hacia afuera (en vez de cerrarse con una tapa), y
-  /// unos arcos concéntricos sugieren la presión escapando hacia el
-  /// exterior — la representación física real de un extremo abierto.
+  /// unos arcos concéntricos sugieren la onda ENTRANDO desde el exterior
+  /// hacia el interior del tubo (arcos que "apuntan" hacia adentro).
   void _dibujarBocaAbierta(Canvas canvas, double x, double yTop, double yBot, {required bool esIzquierda}) {
     const double flare = 14.0;
     final double dx = esIzquierda ? -flare : flare;
@@ -723,7 +741,10 @@ class NormalModeFronteraPainter extends CustomPainter {
     canvas.drawLine(Offset(x, yBot), Offset(x + dx, yBot + 6), paintBorde);
 
     final double centroYBoca = (yTop + yBot) / 2;
-    final double anguloCentro = esIzquierda ? math.pi : 0;
+    // Antes: pi/0 (arcos abriéndose hacia afuera, como si la onda saliera
+    // del tubo). Invertido: 0/pi, para que los arcos se abran hacia el
+    // interior del tubo, como si la onda estuviera entrando.
+    final double anguloCentro = esIzquierda ? 0 : math.pi;
     final paintOnda = Paint()
       ..color = Colors.cyanAccent.withOpacity(0.28)
       ..style = PaintingStyle.stroke
@@ -748,7 +769,7 @@ class NormalModeFronteraPainter extends CustomPainter {
         final double siguiente = distancia + (dibujar ? dashWidth : gapWidth);
         if (dibujar) {
           final double fin = math.min(siguiente, metric.length);
-          final extracto = metric.extractPath(distancia, fin);
+          final extracto = metric.extractPath(distancia, fin);f
           canvas.drawPath(extracto, paint);
         }
         distancia = siguiente;

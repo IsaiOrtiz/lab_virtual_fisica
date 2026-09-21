@@ -109,10 +109,19 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
       if (bytes != null) {
         if (!mounted) return;
 
+        // Pausamos la simulación mientras se revisa la captura: si sigue
+        // corriendo y redibujando en segundo plano, el diálogo se siente
+        // como si "pasara muy rápido" y no da tiempo de escribir la nota.
+        final bool estabaCorriendoAntesDeCapturar = _estaCorriendo;
+        if (_estaCorriendo) {
+          setState(() => _estaCorriendo = false);
+        }
+
         final TextEditingController notaController = TextEditingController();
 
-        showDialog(
+        await showDialog<void>(
           context: context,
+          barrierDismissible: false,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
@@ -142,6 +151,7 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: notaController,
+                    autofocus: true,
                     maxLines: 3,
                     style: GoogleFonts.lato(fontSize: 12),
                     decoration: InputDecoration(
@@ -180,6 +190,10 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
             ],
           ),
         );
+
+        if (mounted && estabaCorriendoAntesDeCapturar) {
+          setState(() => _estaCorriendo = true);
+        }
       }
     } catch (e) {
       debugPrint("Error al exportar captura: $e");
@@ -520,10 +534,14 @@ class NormalModePainter extends CustomPainter {
     );
 
     // ---- Tubo cerrado-cerrado (reemplaza a la cuerda con "conitos") ----
-    // Paredes horizontales del tubo: su altura se calcula a partir del
-    // tamaño del canvas (no de la amplitud), así el tubo se ve como un
-    // contenedor fijo y solo la onda interior cambia con los parámetros.
-    final double medioAltoTubo = size.height * 0.42;
+    // Paredes horizontales del tubo: su altura ya NO es un porcentaje fijo
+    // del canvas, sino que se ajusta a la amplitud máxima de la onda (con
+    // un pequeño margen de aire), para que el tubo siempre "abrace" la
+    // cresta más alta que puede alcanzar la cuerda.
+    const double margenTuboSobreAmplitud = 22.0;
+    final double medioAltoMaximo = size.height / 2 - 6;
+    double medioAltoTubo = amplitud + margenTuboSobreAmplitud;
+    if (medioAltoTubo > medioAltoMaximo) medioAltoTubo = medioAltoMaximo;
     final double yTapaSup = centroY - medioAltoTubo;
     final double yTapaInf = centroY + medioAltoTubo;
 

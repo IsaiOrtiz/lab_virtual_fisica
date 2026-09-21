@@ -123,10 +123,19 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
       if (bytes != null) {
         if (!mounted) return;
 
+        // Pausamos la simulación mientras se revisa la captura: si sigue
+        // corriendo y redibujando en segundo plano, el diálogo se siente
+        // como si "pasara muy rápido" y no da tiempo de escribir la nota.
+        final bool estabaCorriendoAntesDeCapturar = _estaCorriendo;
+        if (_estaCorriendo) {
+          setState(() => _estaCorriendo = false);
+        }
+
         final TextEditingController notaController = TextEditingController();
 
-        showDialog(
+        await showDialog<void>(
           context: context,
+          barrierDismissible: false,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFFF5F6FA),
             title: Text(
@@ -156,6 +165,7 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: notaController,
+                    autofocus: true,
                     maxLines: 3,
                     style: GoogleFonts.lato(fontSize: 12),
                     decoration: InputDecoration(
@@ -194,6 +204,10 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
             ],
           ),
         );
+
+        if (mounted && estabaCorriendoAntesDeCapturar) {
+          setState(() => _estaCorriendo = true);
+        }
       }
     } catch (e) {
       debugPrint("Error al exportar captura: $e");
