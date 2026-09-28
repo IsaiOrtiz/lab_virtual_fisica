@@ -18,6 +18,8 @@ class ZoomPanControls extends StatelessWidget {
   final Size viewportSize;
   final double pasoZoom;
   final double pasoPan;
+  final double minScale;
+  final double maxScale;
 
   const ZoomPanControls({
     super.key,
@@ -25,9 +27,20 @@ class ZoomPanControls extends StatelessWidget {
     required this.viewportSize,
     this.pasoZoom = 1.2,
     this.pasoPan = 40,
+    this.minScale = 0.75,
+    this.maxScale = 2.5,
   });
 
   void _zoomPor(double factor) {
+    final double escalaActual = controller.value.getMaxScaleOnAxis();
+    final double escalaObjetivo =
+        (escalaActual * factor).clamp(minScale, maxScale).toDouble();
+    final double factorReal = escalaActual == 0
+        ? 1.0
+        : escalaObjetivo / escalaActual;
+
+    if ((factorReal - 1.0).abs() < 0.001) return;
+
     final double cx = viewportSize.width / 2;
     final double cy = viewportSize.height / 2;
     // IMPORTANTE: la transformación de un InteractiveViewer mapea
@@ -41,7 +54,7 @@ class ZoomPanControls extends StatelessWidget {
     // arrastre).
     final Matrix4 correccion = Matrix4.identity()
       ..translate(cx, cy)
-      ..scale(factor)
+      ..scale(factorReal)
       ..translate(-cx, -cy);
     controller.value = correccion.multiplied(controller.value);
   }

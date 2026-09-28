@@ -471,16 +471,14 @@ class NormalModePainter extends CustomPainter {
 
     final double wn = 2 * math.pi * frecuenciaModo;
 
-    // NOTA: la cuadrícula de fondo ya no se dibuja aquí — vive en una
-    // capa fija aparte (FondoCuadriculaPainter) que nunca se transforma,
-    // así el "plano" de la simulación siempre ocupa el mismo espacio en
-    // pantalla y solo la cuerda hace zoom/pan.
+    // La cuadrícula vive en el mismo plano que este painter, por lo que
+    // conserva exactamente la misma escala y posición durante el zoom/pan.
 
     // Eje central de referencia
     canvas.drawLine(
       Offset(margen, centroY),
       Offset(size.width - margen, centroY),
-      Paint()..color = Colors.white.withOpacity(0.15)..strokeWidth = 1,
+      Paint()..color = const Color(0xFFB8C4CF).withOpacity(0.18)..strokeWidth = 1,
     );
 
     // ---- Envolvente (curvas guía ± amplitud·sin) ----
@@ -499,7 +497,7 @@ class NormalModePainter extends CustomPainter {
         }
       }
       final paintEnvolvente = Paint()
-        ..color = Colors.purpleAccent.withOpacity(0.35)
+        ..color = const Color(0xFF8FA6B8).withOpacity(0.38)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2;
       _dibujarLineaPunteada(canvas, pathSup, paintEnvolvente);
@@ -519,7 +517,7 @@ class NormalModePainter extends CustomPainter {
     }
 
     final glowPaint = Paint()
-      ..color = const Color(0xFFE040FB).withOpacity(0.25)
+      ..color = const Color(0xFF6F8FAF).withOpacity(0.20)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 9.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
@@ -528,7 +526,7 @@ class NormalModePainter extends CustomPainter {
     canvas.drawPath(
       pathCuerda,
       Paint()
-        ..color = const Color(0xFFE040FB) // Magenta vibrante
+        ..color = const Color(0xFF6F8FAF) // Azul grisáceo, de baja saturación
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5,
     );
@@ -546,7 +544,7 @@ class NormalModePainter extends CustomPainter {
     final double yTapaInf = centroY + medioAltoTubo;
 
     final paintParedTubo = Paint()
-      ..color = Colors.white.withOpacity(0.45)
+      ..color = const Color(0xFFB8C4CF).withOpacity(0.50)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawLine(Offset(margen, yTapaSup), Offset(size.width - margen, yTapaSup), paintParedTubo);
@@ -556,7 +554,7 @@ class NormalModePainter extends CustomPainter {
     // AMBOS extremos están cerrados (equivalente físico de un extremo
     // fijo en la cuerda).
     final paintTapaExtremo = Paint()
-      ..color = Colors.white.withOpacity(0.7)
+      ..color = const Color(0xFFD0D8DE).withOpacity(0.72)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
     canvas.drawLine(Offset(margen, yTapaSup), Offset(margen, yTapaInf), paintTapaExtremo);
@@ -568,8 +566,8 @@ class NormalModePainter extends CustomPainter {
       for (int m = 1; m < modo; m++) {
         final double xi = m * largoCuerda / modo;
         final double x = margen + xi;
-        canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = Colors.redAccent.withOpacity(0.85));
-        canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = Colors.white.withOpacity(0.6)..style = PaintingStyle.stroke..strokeWidth = 1.0);
+        canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = const Color(0xFFC47F7F).withOpacity(0.82));
+        canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = const Color(0xFFD0D8DE).withOpacity(0.62)..style = PaintingStyle.stroke..strokeWidth = 1.0);
       }
       // Antinodos: guía vertical punteada en xi = (m+0.5) * L/n
       for (int m = 0; m < modo; m++) {
@@ -582,7 +580,7 @@ class NormalModePainter extends CustomPainter {
           canvas,
           pathGuia,
           Paint()
-            ..color = Colors.cyanAccent.withOpacity(0.25)
+            ..color = const Color(0xFF7FA39D).withOpacity(0.30)
             ..strokeWidth = 1.0,
           dashWidth: 4,
           gapWidth: 5,
@@ -591,15 +589,22 @@ class NormalModePainter extends CustomPainter {
     }
 
     // ---- Etiqueta informativa ----
+    // Se coloca junto al tubo para que la lectura quede asociada visualmente
+    // con la simulación, en lugar de quedar pegada al borde superior.
     final etiqueta = TextPainter(
       text: TextSpan(
         text: "Modo n=$modo  ·  fₙ=${frecuenciaModo.toStringAsFixed(2)} Hz",
-        style: GoogleFonts.sourceCodePro(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.bold),
+        style: GoogleFonts.sourceCodePro(
+          fontSize: 10,
+          color: const Color(0xFFD0D8DE).withOpacity(0.82),
+          fontWeight: FontWeight.bold,
+        ),
       ),
       textDirection: TextDirection.ltr,
     );
     etiqueta.layout();
-    etiqueta.paint(canvas, Offset(margen, 10));
+    final double yEtiqueta = math.max(6.0, yTapaSup - etiqueta.height - 6.0);
+    etiqueta.paint(canvas, Offset(margen + 4, yEtiqueta));
   }
 
   void _dibujarLineaPunteada(Canvas canvas, Path path, Paint paint, {double dashWidth = 5, double gapWidth = 4}) {

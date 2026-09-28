@@ -572,14 +572,14 @@ class NormalModeFronteraPainter extends CustomPainter {
     final double wn = 2 * math.pi * frecuenciaModo;
     final double cosT = math.cos(wn * tiempo);
 
-    // NOTA: la cuadrícula de fondo vive en una capa fija aparte
-    // (FondoCuadriculaPainter) que nunca se transforma.
+    // La cuadrícula vive en el mismo plano que este painter, por lo que
+    // conserva exactamente la misma escala y posición durante el zoom/pan.
 
     // Eje central de referencia
     canvas.drawLine(
       Offset(margen, centroY),
       Offset(size.width - margen, centroY),
-      Paint()..color = Colors.white.withOpacity(0.15)..strokeWidth = 1,
+      Paint()..color = const Color(0xFFB8C4CF).withOpacity(0.18)..strokeWidth = 1,
     );
 
     // ---- Envolvente (curvas guía ± amplitud·forma) ----
@@ -598,7 +598,7 @@ class NormalModeFronteraPainter extends CustomPainter {
         }
       }
       final paintEnvolvente = Paint()
-        ..color = Colors.purpleAccent.withOpacity(0.35)
+        ..color = const Color(0xFF8FA6B8).withOpacity(0.38)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2;
       _dibujarLineaPunteada(canvas, pathSup, paintEnvolvente);
@@ -618,7 +618,7 @@ class NormalModeFronteraPainter extends CustomPainter {
     }
 
     final glowPaint = Paint()
-      ..color = const Color(0xFFE040FB).withOpacity(0.25)
+      ..color = const Color(0xFF6F8FAF).withOpacity(0.20)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 9.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
@@ -627,7 +627,7 @@ class NormalModeFronteraPainter extends CustomPainter {
     canvas.drawPath(
       pathCuerda,
       Paint()
-        ..color = const Color(0xFFE040FB) // Magenta vibrante
+        ..color = const Color(0xFF6F8FAF) // Azul grisáceo, de baja saturación
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5,
     );
@@ -644,7 +644,7 @@ class NormalModeFronteraPainter extends CustomPainter {
     final double yTapaInf = centroY + medioAltoTubo;
 
     final paintParedTubo = Paint()
-      ..color = Colors.white.withOpacity(0.45)
+      ..color = const Color(0xFFB8C4CF).withOpacity(0.50)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawLine(Offset(margen, yTapaSup), Offset(size.width - margen, yTapaSup), paintParedTubo);
@@ -668,8 +668,8 @@ class NormalModeFronteraPainter extends CustomPainter {
         // Detecta cambios de signo (cruce por cero) como NODOS internos.
         if (anterior != 0 && actual != 0 && (anterior > 0) != (actual > 0)) {
           final double x = margen + xi;
-          canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = Colors.redAccent.withOpacity(0.85));
-          canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = Colors.white.withOpacity(0.6)..style = PaintingStyle.stroke..strokeWidth = 1.0);
+          canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = const Color(0xFFC47F7F).withOpacity(0.82));
+          canvas.drawCircle(Offset(x, centroY), 5.0, Paint()..color = const Color(0xFFD0D8DE).withOpacity(0.62)..style = PaintingStyle.stroke..strokeWidth = 1.0);
         }
         anterior = actual;
       }
@@ -688,7 +688,7 @@ class NormalModeFronteraPainter extends CustomPainter {
             canvas,
             pathGuia,
             Paint()
-              ..color = Colors.cyanAccent.withOpacity(0.25)
+              ..color = const Color(0xFF7FA39D).withOpacity(0.30)
               ..strokeWidth = 1.0,
             dashWidth: 4,
             gapWidth: 5,
@@ -700,16 +700,27 @@ class NormalModeFronteraPainter extends CustomPainter {
     }
 
     // ---- Etiqueta informativa ----
-    final String nombreFrontera = condicion == CondicionFrontera.fijoAbierto ? "Fijo-Abierto" : "Abierto-Abierto";
+    // Se coloca inmediatamente sobre el tubo para mantener la información
+    // visualmente ligada a la forma física representada.
+    final String nombreFrontera =
+        condicion == CondicionFrontera.fijoAbierto
+            ? "Fijo-Abierto"
+            : "Abierto-Abierto";
     final etiqueta = TextPainter(
       text: TextSpan(
-        text: "$nombreFrontera  ·  k=$armonicoK  ·  fₖ=${frecuenciaModo.toStringAsFixed(2)} Hz",
-        style: GoogleFonts.sourceCodePro(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.bold),
+        text:
+            "$nombreFrontera  ·  k=$armonicoK  ·  fₖ=${frecuenciaModo.toStringAsFixed(2)} Hz",
+        style: GoogleFonts.sourceCodePro(
+          fontSize: 10,
+          color: const Color(0xFFD0D8DE).withOpacity(0.82),
+          fontWeight: FontWeight.bold,
+        ),
       ),
       textDirection: TextDirection.ltr,
     );
     etiqueta.layout();
-    etiqueta.paint(canvas, Offset(margen, 10));
+    final double yEtiqueta = math.max(6.0, yTapaSup - etiqueta.height - 6.0);
+    etiqueta.paint(canvas, Offset(margen + 4, yEtiqueta));
   }
 
   /// Dibuja la pared sólida de un extremo CERRADO/FIJO del tubo: una
@@ -719,7 +730,7 @@ class NormalModeFronteraPainter extends CustomPainter {
       Offset(x, yTop),
       Offset(x, yBot),
       Paint()
-        ..color = Colors.white.withOpacity(0.7)
+        ..color = const Color(0xFFD0D8DE).withOpacity(0.72)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4.0,
     );
@@ -734,7 +745,7 @@ class NormalModeFronteraPainter extends CustomPainter {
     final double dx = esIzquierda ? -flare : flare;
 
     final paintBorde = Paint()
-      ..color = Colors.white.withOpacity(0.45)
+      ..color = const Color(0xFFB8C4CF).withOpacity(0.50)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawLine(Offset(x, yTop), Offset(x + dx, yTop - 6), paintBorde);
@@ -746,7 +757,7 @@ class NormalModeFronteraPainter extends CustomPainter {
     // interior del tubo, como si la onda estuviera entrando.
     final double anguloCentro = esIzquierda ? 0 : math.pi;
     final paintOnda = Paint()
-      ..color = Colors.cyanAccent.withOpacity(0.28)
+      ..color = const Color(0xFF7FA39D).withOpacity(0.32)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     for (int i = 1; i <= 3; i++) {
