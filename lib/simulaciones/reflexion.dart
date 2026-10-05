@@ -8,8 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/navegacion_simulacion.dart';
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 
 /// Simulación de la Ley de la Reflexión (reflexión ESPECULAR, superficie
 /// lisa): un rayo incidente llega a un espejo plano y se refleja de modo
@@ -34,7 +33,6 @@ class _ReflexionLuzSimState extends State<ReflexionLuzSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros de la simulación
   double anguloIncidencia = 35.0; // grados, medido desde la normal (0-90)
@@ -60,7 +58,6 @@ class _ReflexionLuzSimState extends State<ReflexionLuzSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -188,7 +185,6 @@ class _ReflexionLuzSimState extends State<ReflexionLuzSim> {
           builder: (context, constraints) {
             final altoDisponible = constraints.maxHeight;
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -242,22 +238,13 @@ class _ReflexionLuzSimState extends State<ReflexionLuzSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
-                          fondoPainter: const FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
+                        child: SimulationCanvas(
+                          fondoPainter: FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
                           contenidoPainter: ReflexionPainter(
                             tiempo: tiempo,
                             anguloIncidenciaGrados: anguloIncidencia,
                             mostrarAngulos: mostrarAngulos,
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
                         ),
                       ),
                       Positioned(
@@ -376,6 +363,11 @@ class ReflexionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Recorta los rayos al área real de la simulación para evitar que
+    // cualquier punta de flecha o prolongación salga del cuadro.
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+
     final double espejoY = size.height * 0.6;
     final Offset p = Offset(size.width / 2, espejoY);
     final double theta = anguloIncidenciaGrados * math.pi / 180.0;
@@ -444,6 +436,8 @@ class ReflexionPainter extends CustomPainter {
     );
     etiqueta.layout();
     etiqueta.paint(canvas, const Offset(12, 10));
+
+    canvas.restore();
   }
 
   void _dibujarFlecha(Canvas canvas, Offset origen, Offset destino, Color color, {double grosor = 2}) {

@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class OndasEstacionariasSim extends StatefulWidget {
@@ -32,7 +31,6 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
   final GlobalKey _globalKeyCaptura = GlobalKey();
 
   // Controlador de transformación para Zoom y Pan (desplazamiento) táctil/con botones
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros de la Onda Estacionaria
   double amplitudComponente = 25.0; // Amplitud A de cada onda viajera
@@ -61,7 +59,6 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -199,7 +196,6 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
             // Tamaño real del área de dibujo (sin contar el panel lateral),
             // usado para centrar el zoom con los botones.
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -260,8 +256,7 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
+                        child: SimulationCanvas(
                           fondoPainter: const _FondoReglaEstacionaria(),
                           contenidoPainter: StandingWavePainter(
                             tiempo: tiempo,
@@ -274,14 +269,6 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
                       ),
 
                       // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
-                        ),
-                      ),
 
                       // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(
@@ -392,7 +379,7 @@ class _OndasEstacionariasSimState extends State<OndasEstacionariasSim> {
 
 /// Fondo FIJO estilo "azul pizarra" con cuadrícula y etiquetas de
 /// amplitud en px. Vive en una capa aparte que nunca se transforma con
-/// el zoom/pan (ver [ZoomableSimulationCanvas]), así el "plano" siempre
+/// el zoom/pan (ver [SimulationCanvas]), así el "plano" siempre
 /// ocupa el mismo espacio en pantalla; solo las curvas de onda se
 /// acercan o desplazan.
 class _FondoReglaEstacionaria extends CustomPainter {

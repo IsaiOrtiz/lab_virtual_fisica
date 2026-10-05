@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/fondo_regla_tubo.dart';
 import '../widgets/navegacion_simulacion.dart';
 
@@ -36,7 +35,6 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros del Modo Normal
   int modo = 2; // Número de armónico "n"
@@ -89,7 +87,6 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -221,7 +218,6 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
 
             // Tamaño real del área de dibujo (sin contar el panel lateral)
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -316,8 +312,7 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
+                        child: SimulationCanvas(
                           fondoPainter: FondoReglaTuboNormal(longitudFisica: longitudCuerda),
                           contenidoPainter: NormalModePainter(
                             tiempo: tiempo,
@@ -331,14 +326,6 @@ class _ModosNormalesSimState extends State<ModosNormalesSim> {
                       ),
 
                       // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
-                        ),
-                      ),
 
                       // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(

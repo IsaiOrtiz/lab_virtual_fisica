@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 /// Simulación de Ondas Longitudinales (p.ej. ondas de sonido).
@@ -34,7 +33,6 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros de la Onda Longitudinal
   double amplitud = 8.0;
@@ -64,7 +62,6 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -194,7 +191,6 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
 
             // Tamaño real del área de dibujo (sin contar el panel lateral)
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             final int numParticulas = numParticulasD.round();
             // Evitamos que la amplitud provoque que las partículas se
@@ -289,8 +285,7 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
+                        child: SimulationCanvas(
                           colorFondo: const Color(0xFF111827), // Gris pizarra muy oscuro
                           contenidoPainter: LongitudinalWavePainter(
                             tiempo: tiempo,
@@ -305,14 +300,6 @@ class _OndasLongitudinalesSimState extends State<OndasLongitudinalesSim> {
                       ),
 
                       // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
-                        ),
-                      ),
 
                       // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(
@@ -444,7 +431,7 @@ class LongitudinalWavePainter extends CustomPainter {
     final double argumentoTiempo = haciaDerecha ? (tiempo * w) : -(tiempo * w);
 
     // NOTA: la cuadrícula de fondo ahora vive en una capa fija aparte
-    // (FondoCuadriculaPainter, ver ZoomableSimulationCanvas) que nunca
+    // (FondoCuadriculaPainter, ver SimulationCanvas) que nunca
     // se transforma, así el "plano" siempre ocupa el mismo espacio en
     // pantalla y solo el contenido (partículas/onda) hace zoom/pan.
 

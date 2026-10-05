@@ -8,8 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/navegacion_simulacion.dart';
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 
 enum TipoEspejo { concavo, convexo }
 
@@ -42,7 +41,6 @@ class _EspejoCurvoSimState extends State<EspejoCurvoSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros de la simulación
   TipoEspejo tipoEspejo = TipoEspejo.concavo;
@@ -72,7 +70,6 @@ class _EspejoCurvoSimState extends State<EspejoCurvoSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -215,7 +212,6 @@ class _EspejoCurvoSimState extends State<EspejoCurvoSim> {
           builder: (context, constraints) {
             final altoDisponible = constraints.maxHeight;
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -321,9 +317,8 @@ class _EspejoCurvoSimState extends State<EspejoCurvoSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
-                          fondoPainter: const FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
+                        child: SimulationCanvas(
+                          fondoPainter: FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
                           contenidoPainter: EspejoCurvoPainter(
                             tiempo: tiempo,
                             tipoEspejo: tipoEspejo,
@@ -333,14 +328,6 @@ class _EspejoCurvoSimState extends State<EspejoCurvoSim> {
                             mostrarRayos: mostrarRayos,
                             mostrarEtiquetas: mostrarEtiquetas,
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
                         ),
                       ),
                       Positioned(
@@ -469,151 +456,273 @@ class EspejoCurvoPainter extends CustomPainter {
     required this.mostrarEtiquetas,
   });
 
-  static const double escala = 16.0; // px por unidad física
-  static const Color colorEjes = Color(0xFF212121);
-  static const Color colorObjeto = Color(0xFF1565C0); // azul
-  static const Color colorImagen = Color(0xFFD32F2F); // rojo
-  static const Color colorRayo1 = Color(0xFFF57C00); // naranja
-  static const Color colorRayo2 = Color(0xFF2E7D32); // verde
-  static const Color colorRayo3 = Color(0xFF6A1B9A); // morado
+  static const Color colorEjes = Color(0xFF374151);
+  static const Color colorEspejo = Color(0xFF455A64);
+  static const Color colorObjeto = Color(0xFF1565C0);
+  static const Color colorImagen = Color(0xFFC62828);
+  static const Color colorRayo1 = Color(0xFFB45309);
+  static const Color colorRayo2 = Color(0xFF2E7D32);
+  static const Color colorRayo3 = Color(0xFF6A1B9A);
+
+  double get _fSigned => tipoEspejo == TipoEspejo.concavo ? distanciaFocal : -distanciaFocal;
+  double get _centerX => -2 * _fSigned;
+  double get _radius => 2 * distanciaFocal;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double fSigned = tipoEspejo == TipoEspejo.concavo ? distanciaFocal : -distanciaFocal;
-    final double vertexX = size.width * 0.58;
-    final double axisY = size.height / 2;
+    // Toda la óptica se mantiene dentro del área visible. Los rayos que
+    // físicamente continuarían fuera del lienzo se recortan en sus bordes.
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+
     final bool esConcavo = tipoEspejo == TipoEspejo.concavo;
+    final double f = _fSigned;
+    final double c = _centerX;
+    final double r = _radius;
 
-    Offset toCanvas(double xFisico, double yFisico) => Offset(vertexX + xFisico * escala, axisY - yFisico * escala);
+    // Encuadre automático: se calcula a partir del objeto y de los puntos
+    // cardinales para que toda la construcción quede centrada sin zoom.
+    final double minX = math.min(-distanciaObjeto, math.min(0, c)) - 3;
+    final double maxX = math.max(0, math.max(c, -f)) + 3;
+    final double apertura = math.min(8.0, r * 0.72);
+    final double rangoX = math.max(1, maxX - minX);
+    final double rangoY = math.max(14, apertura * 2 + 5);
+    final double escala = math.min(
+      (size.width - 70) / rangoX,
+      (size.height - 105) / rangoY,
+    ).clamp(8.0, 24.0).toDouble();
+    final double ejeY = size.height * 0.56;
+    final double origenX = (size.width - rangoX * escala) / 2 - minX * escala;
 
-    // ---- Eje óptico (horizontal) ----
-    canvas.drawLine(Offset(0, axisY), Offset(size.width, axisY), Paint()..color = colorEjes..strokeWidth = 1.4);
+    Offset toCanvas(double x, double y) => Offset(
+      origenX + x * escala,
+      ejeY - y * escala,
+    );
 
-    // ---- Espejo curvo ----
-    final double R = 2 * distanciaFocal;
-    final double centerXFisico = -2 * fSigned; // posición física de C
-    final double focoXFisico = -fSigned; // posición física de F
-    final double alturaMirror = math.min(9.0, R * 0.85);
+    // Eje óptico.
+    canvas.drawLine(
+      Offset(20, ejeY),
+      Offset(size.width - 20, ejeY),
+      Paint()..color = colorEjes.withOpacity(0.55)..strokeWidth = 1.2,
+    );
 
-    final Path pathEspejo = Path();
-    const int pasos = 60;
+    // Espejo esférico real. La curva y los rayos usan exactamente la misma
+    // geometría, evitando que los puntos de incidencia queden fuera del espejo.
+    final Path espejo = Path();
+    const int pasos = 100;
     for (int i = 0; i <= pasos; i++) {
-      final double y = -alturaMirror + (2 * alturaMirror) * i / pasos;
-      final double raiz = math.sqrt(math.max(0, R * R - y * y));
-      final double x = esConcavo ? (-R + raiz) : (R - raiz);
-      final Offset punto = toCanvas(x, y);
+      final double y = -apertura + 2 * apertura * i / pasos;
+      final double raiz = math.sqrt(math.max(0, r * r - y * y));
+      final double x = esConcavo ? -r + raiz : r - raiz;
+      final p = toCanvas(x, y);
       if (i == 0) {
-        pathEspejo.moveTo(punto.dx, punto.dy);
+        espejo.moveTo(p.dx, p.dy);
       } else {
-        pathEspejo.lineTo(punto.dx, punto.dy);
+        espejo.lineTo(p.dx, p.dy);
       }
     }
-    canvas.drawPath(pathEspejo, Paint()..color = Colors.cyan[800]!..style = PaintingStyle.stroke..strokeWidth = 3.0);
+    canvas.drawPath(
+      espejo,
+      Paint()
+        ..color = colorEspejo
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
 
-    // Sombreado (respaldo sólido) detrás del espejo
-    final Paint paintSombreado = Paint()..color = colorEjes.withOpacity(0.3)..strokeWidth = 1.0;
-    for (int i = 0; i <= pasos; i += 3) {
-      final double y = -alturaMirror + (2 * alturaMirror) * i / pasos;
-      final double raiz = math.sqrt(math.max(0, R * R - y * y));
-      final double x = esConcavo ? (-R + raiz) : (R - raiz);
-      final double dxSombra = 10;
-      final Offset p1 = toCanvas(x, y);
-      canvas.drawLine(p1, Offset(p1.dx + dxSombra, p1.dy + 8), paintSombreado);
+    // Respaldo del espejo para distinguir el lado no reflectante.
+    final Paint respaldo = Paint()
+      ..color = colorEspejo.withOpacity(0.18)
+      ..strokeWidth = 1;
+    for (int i = 0; i < pasos; i += 6) {
+      final double y = -apertura + 2 * apertura * i / pasos;
+      final double raiz = math.sqrt(math.max(0, r * r - y * y));
+      final double x = esConcavo ? -r + raiz : r - raiz;
+      final p = toCanvas(x, y);
+      final double lado = esConcavo ? 8 : -8;
+      canvas.drawLine(p, Offset(p.dx + lado, p.dy + 7), respaldo);
     }
 
-    // ---- Marcas de V, F y C ----
+    final double foco = -f;
     if (mostrarEtiquetas) {
-      _marcaEje(canvas, toCanvas(0, 0), "V", colorEjes);
-      _marcaEje(canvas, toCanvas(focoXFisico, 0), "F", Colors.teal[800]!);
-      _marcaEje(canvas, toCanvas(centerXFisico, 0), "C", Colors.deepOrange[800]!);
+      _marcaEje(canvas, toCanvas(0, 0), 'V', colorEjes);
+      _marcaEje(canvas, toCanvas(foco, 0), 'F', const Color(0xFF00695C));
+      _marcaEje(canvas, toCanvas(c, 0), 'C', const Color(0xFFAD4B00));
     }
 
-    // ---- Objeto (flecha azul, siempre real) ----
-    final Offset baseObjeto = toCanvas(-distanciaObjeto, 0);
+    // Objeto.
     final Offset puntaObjeto = toCanvas(-distanciaObjeto, alturaObjeto);
-    _dibujarFlechaObjeto(canvas, baseObjeto, puntaObjeto, colorObjeto);
+    _dibujarFlechaObjeto(
+      canvas,
+      toCanvas(-distanciaObjeto, 0),
+      puntaObjeto,
+      colorObjeto,
+    );
 
-    // ---- Cálculo de imagen ----
-    final double denom = (1 / fSigned) - (1 / distanciaObjeto);
-    double? di, m, hi;
-    if (denom.abs() >= 1e-6) {
+    final double denom = (1 / f) - (1 / distanciaObjeto);
+    double? di;
+    double? m;
+    double? hi;
+    if (denom.abs() > 1e-7) {
       di = 1 / denom;
       m = -di / distanciaObjeto;
       hi = m * alturaObjeto;
     }
 
-    // ---- Rayos principales ----
     if (mostrarRayos) {
-      final Offset tipFisico = Offset(-distanciaObjeto, alturaObjeto);
+      // Los tres rayos se calculan mediante reflexión vectorial sobre la
+      // normal de la esfera. Así funcionan tanto para cóncavos como convexos
+      // y para cualquier posición del objeto.
+      final List<_RayoPrincipal> rayos = [
+        _RayoPrincipal(puntaObjeto, const Offset(1, 0), colorRayo1),
+        _RayoPrincipal(puntaObjeto, _normalizar(toCanvas(foco, 0) - puntaObjeto), colorRayo2),
+        _RayoPrincipal(puntaObjeto, _normalizar(toCanvas(c, 0) - puntaObjeto), colorRayo3),
+      ];
 
-      // Rayo 1: paralelo -> pasa por F
-      final Offset hit1Fisico = Offset(0, alturaObjeto);
-      _dibujarSegmento(canvas, toCanvas(tipFisico.dx, tipFisico.dy), toCanvas(hit1Fisico.dx, hit1Fisico.dy), colorRayo1, dashed: false);
-      final Offset fFisico = Offset(focoXFisico, 0);
-      final Offset dir1 = esConcavo ? (fFisico - hit1Fisico) : (hit1Fisico - fFisico);
-      final Offset dir1Norm = _normalizar(dir1);
-      final Offset finReal1 = hit1Fisico + dir1Norm * 40;
-      _dibujarSegmento(canvas, toCanvas(hit1Fisico.dx, hit1Fisico.dy), toCanvas(finReal1.dx, finReal1.dy), colorRayo1, dashed: false);
-      if (!esConcavo) {
-        _dibujarSegmento(canvas, toCanvas(hit1Fisico.dx, hit1Fisico.dy), toCanvas(fFisico.dx, fFisico.dy), colorRayo1, dashed: true);
-      }
+      // Las direcciones de los dos últimos rayos se calculan en coordenadas
+      // físicas, no en píxeles.
+      rayos[1] = _RayoPrincipal(
+        puntaObjeto,
+        _normalizar(Offset(foco + distanciaObjeto, -alturaObjeto)),
+        colorRayo2,
+      );
+      rayos[2] = _RayoPrincipal(
+        puntaObjeto,
+        _normalizar(Offset(c + distanciaObjeto, -alturaObjeto)),
+        colorRayo3,
+      );
 
-      // Rayo 2: pasa por F -> sale paralelo
-      if ((distanciaObjeto - fSigned).abs() > 1e-3) {
-        final double y2 = -fSigned * alturaObjeto / (distanciaObjeto - fSigned);
-        final Offset hit2Fisico = Offset(0, y2);
-        _dibujarSegmento(canvas, toCanvas(tipFisico.dx, tipFisico.dy), toCanvas(hit2Fisico.dx, hit2Fisico.dy), colorRayo2, dashed: false);
-        final Offset finReal2 = Offset(-40, y2);
-        _dibujarSegmento(canvas, toCanvas(hit2Fisico.dx, hit2Fisico.dy), toCanvas(finReal2.dx, finReal2.dy), colorRayo2, dashed: false);
-      }
+      for (final rayo in rayos) {
+        final Offset origenFisico = Offset(-distanciaObjeto, alturaObjeto);
+        final Offset hitFisico = _interseccionEsfera(origenFisico, rayo.direccionFisica, Offset(c, 0), r);
+        if (hitFisico.dx.isNaN) continue;
 
-      // Rayo 3: pasa por C -> incide perpendicular al espejo y se
-      // refleja sobre la MISMA línea (ida y vuelta se sobreponen). La
-      // parte real (sólida) es la que queda frente al espejo (x <= 0);
-      // si C está detrás del espejo (convexo), la parte de x=0 hasta C
-      // es una construcción virtual (punteada).
-      final Offset cFisico = Offset(centerXFisico, 0);
-      final Offset dirTipC = cFisico - tipFisico;
-      if (dirTipC.dx.abs() > 1e-3) {
-        final Offset dirTipCNorm = _normalizar(dirTipC);
-        final double tCorte = (0 - tipFisico.dx) / dirTipCNorm.dx;
-        final Offset hit3 = tipFisico + dirTipCNorm * tCorte;
-        // Dirección que apunta hacia x negativa (frente al espejo), sin
-        // importar hacia dónde apuntaba originalmente dirTipCNorm.
-        final Offset dirHaciaFrente = dirTipCNorm.dx > 0 ? -dirTipCNorm : dirTipCNorm;
-        final Offset finSolido = hit3 + dirHaciaFrente * 45;
-        _dibujarSegmento(canvas, toCanvas(hit3.dx, hit3.dy), toCanvas(finSolido.dx, finSolido.dy), colorRayo3, dashed: false);
-        if (centerXFisico > 0) {
-          // Espejo convexo: C está detrás del espejo (construcción virtual).
-          _dibujarSegmento(canvas, toCanvas(hit3.dx, hit3.dy), toCanvas(cFisico.dx, cFisico.dy), colorRayo3, dashed: true);
+        final Offset hit = toCanvas(hitFisico.dx, hitFisico.dy);
+        _dibujarSegmento(canvas, puntaObjeto, hit, rayo.color, dashed: false);
+
+        final Offset normal = _normalizar(hitFisico - Offset(c, 0));
+        final Offset reflejado = _normalizar(
+          rayo.direccionFisica - normal * (2 * _dot(rayo.direccionFisica, normal)),
+        );
+        final Offset finFisico = hitFisico + reflejado * 50;
+        _dibujarSegmento(canvas, hit, toCanvas(finFisico.dx, finFisico.dy), rayo.color, dashed: false);
+
+        // En un convexo la prolongación virtual va detrás del espejo.
+        // En un cóncavo solo se dibuja construcción virtual si corresponde.
+        final Offset extension = hitFisico - reflejado * 35;
+        if (!esConcavo || (di != null && di < 0)) {
+          _dibujarSegmento(canvas, hit, toCanvas(extension.dx, extension.dy), rayo.color, dashed: true);
         }
       }
     }
 
-    // ---- Imagen (flecha roja, sólida si real, punteada si virtual) ----
+    // Imagen calculada por la ecuación del espejo. Para valores muy grandes
+    // (por ejemplo, muy cerca del foco) se coloca en el borde útil del
+    // encuadre, pero se conserva el valor físico real en el panel de datos.
+    // Así nunca desaparece la imagen de la simulación.
     if (di != null && hi != null) {
-      final Offset baseImagen = toCanvas(-di, 0);
-      final Offset puntaImagen = toCanvas(-di, hi);
-      final bool esReal = di > 0;
-      _dibujarFlechaObjeto(canvas, baseImagen, puntaImagen, colorImagen, dashed: !esReal);
+      final double maxImagenVisible = math.max(8.0, rangoX * 0.42);
+      final double diVisual = di.clamp(-maxImagenVisible, maxImagenVisible).toDouble();
+      final double factorAltura = di.abs() > maxImagenVisible
+          ? maxImagenVisible / di.abs()
+          : 1.0;
+      final double hiVisual = hi * factorAltura;
+      final Offset baseImagen = toCanvas(-diVisual, 0);
+      final Offset puntaImagen = toCanvas(-diVisual, hiVisual);
+
+      // Marca de que la posición está comprimida fuera de escala lineal.
+      if (di.abs() > maxImagenVisible) {
+        _dibujarSegmento(
+          canvas,
+          toCanvas(0, 0),
+          baseImagen,
+          colorImagen,
+          dashed: true,
+        );
+      }
+
+      _dibujarFlechaObjeto(
+        canvas,
+        baseImagen,
+        puntaImagen,
+        colorImagen,
+        dashed: di < 0,
+      );
     }
 
-    // ---- Fotón animado sobre el eje óptico (decorativo) ----
-    final double t = (tiempo * 60) % (distanciaObjeto + 40);
-    final Offset posFoton = toCanvas(-distanciaObjeto + t, 0.3 * alturaObjeto * math.sin(tiempo * 3));
-    canvas.drawCircle(posFoton, 3, Paint()..color = Colors.amber.withOpacity(0.6));
+    // Caso excepcional del espejo cóncavo: objeto exactamente en el foco.
+    // La ecuación da dᵢ → ∞, por lo que no existe una imagen finita que pueda
+    // dibujarse dentro del lienzo. Se comunica explícitamente al estudiante.
+    if (esConcavo && di == null) {
+      final rect = Rect.fromLTWH(
+        18,
+        size.height - 58,
+        math.min(size.width - 36, 520),
+        40,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+        Paint()..color = const Color(0xFFFFF3CD),
+      );
+      final aviso = TextPainter(
+        text: TextSpan(
+          text: 'Excepción: dₒ = f → los rayos reflejados son paralelos; la imagen se forma en el infinito.',
+          style: GoogleFonts.lato(
+            fontSize: 10,
+            color: const Color(0xFF7A5B00),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 2,
+        ellipsis: '…',
+      )..layout(maxWidth: rect.width - 20);
+      aviso.paint(canvas, Offset(rect.left + 10, rect.top + 7));
+    }
 
-    // ---- Etiqueta informativa ----
-    final etiqueta = TextPainter(
+    // Indicador temporal discreto sobre el eje.
+    final double recorrido = (tiempo * 18) % math.max(1.0, distanciaObjeto + 30.0);
+    final double xFot = -distanciaObjeto + recorrido;
+    if (xFot <= 0) {
+      canvas.drawCircle(
+        toCanvas(xFot, 0).translate(0, -3).clampToSize(size),
+        3,
+        Paint()..color = const Color(0xFFB7791F).withOpacity(0.55),
+      );
+    }
+
+    final String titulo = esConcavo ? 'Espejo cóncavo' : 'Espejo convexo';
+    final tp = TextPainter(
       text: TextSpan(
-        text: esConcavo ? "Espejo cóncavo" : "Espejo convexo",
-        style: GoogleFonts.sourceCodePro(fontSize: 11, color: colorEjes.withOpacity(0.7), fontWeight: FontWeight.bold),
+        text: titulo,
+        style: GoogleFonts.sourceCodePro(
+          fontSize: 11,
+          color: colorEjes,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       textDirection: TextDirection.ltr,
-    );
-    etiqueta.layout();
-    etiqueta.paint(canvas, const Offset(12, 10));
+    )..layout();
+    tp.paint(canvas, Offset((size.width - tp.width) / 2, 12));
+
+    canvas.restore();
   }
+
+  Offset _interseccionEsfera(Offset origen, Offset direccion, Offset centro, double radio) {
+    final Offset d = _normalizar(direccion);
+    final Offset oc = origen - centro;
+    final double b = 2 * _dot(oc, d);
+    final double cc = _dot(oc, oc) - radio * radio;
+    final double disc = b * b - 4 * cc;
+    if (disc < 0) return const Offset(double.nan, double.nan);
+    final double raiz = math.sqrt(disc);
+    final double t1 = (-b - raiz) / 2;
+    final double t2 = (-b + raiz) / 2;
+    final candidates = [t1, t2].where((t) => t > 1e-4).toList()..sort();
+    if (candidates.isEmpty) return const Offset(double.nan, double.nan);
+    return origen + d * candidates.first;
+  }
+
+  double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
 
   Offset _normalizar(Offset v) {
     final double len = v.distance;
@@ -624,40 +733,31 @@ class EspejoCurvoPainter extends CustomPainter {
   void _marcaEje(Canvas canvas, Offset punto, String etiqueta, Color color) {
     canvas.drawCircle(punto, 3.2, Paint()..color = color);
     final tp = TextPainter(
-      text: TextSpan(text: etiqueta, style: GoogleFonts.sourceCodePro(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
+      text: TextSpan(text: etiqueta, style: GoogleFonts.sourceCodePro(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
       textDirection: TextDirection.ltr,
-    );
-    tp.layout();
+    )..layout();
     tp.paint(canvas, punto + const Offset(-4, 8));
   }
 
   void _dibujarFlechaObjeto(Canvas canvas, Offset base, Offset punta, Color color, {bool dashed = false}) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2.6
-      ..style = PaintingStyle.stroke;
-
+    final paint = Paint()..color = color..strokeWidth = 2.6..style = PaintingStyle.stroke;
     if (dashed) {
       _dibujarLineaPunteada(canvas, Path()..moveTo(base.dx, base.dy)..lineTo(punta.dx, punta.dy), paint);
     } else {
       canvas.drawLine(base, punta, paint);
     }
-
     final double angulo = math.atan2(punta.dy - base.dy, punta.dx - base.dx);
     const double tamanoPunta = 9;
-    final Path puntaFlecha = Path()
+    final Path cabeza = Path()
       ..moveTo(punta.dx, punta.dy)
       ..lineTo(punta.dx - tamanoPunta * math.cos(angulo - math.pi / 7), punta.dy - tamanoPunta * math.sin(angulo - math.pi / 7))
       ..lineTo(punta.dx - tamanoPunta * math.cos(angulo + math.pi / 7), punta.dy - tamanoPunta * math.sin(angulo + math.pi / 7))
       ..close();
-    canvas.drawPath(puntaFlecha, Paint()..color = color);
+    canvas.drawPath(cabeza, Paint()..color = color);
   }
 
   void _dibujarSegmento(Canvas canvas, Offset a, Offset b, Color color, {required bool dashed}) {
-    final paint = Paint()
-      ..color = color.withOpacity(dashed ? 0.65 : 0.9)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke;
+    final paint = Paint()..color = color.withOpacity(dashed ? 0.52 : 0.88)..strokeWidth = 1.8;
     if (dashed) {
       _dibujarLineaPunteada(canvas, Path()..moveTo(a.dx, a.dy)..lineTo(b.dx, b.dy), paint);
     } else {
@@ -667,15 +767,12 @@ class EspejoCurvoPainter extends CustomPainter {
 
   void _dibujarLineaPunteada(Canvas canvas, Path path, Paint paint, {double dashWidth = 5, double gapWidth = 4}) {
     for (final metric in path.computeMetrics()) {
-      double distancia = 0;
+      double d = 0;
       bool dibujar = true;
-      while (distancia < metric.length) {
-        final double siguiente = distancia + (dibujar ? dashWidth : gapWidth);
-        if (dibujar) {
-          final double fin = math.min(siguiente, metric.length);
-          canvas.drawPath(metric.extractPath(distancia, fin), paint);
-        }
-        distancia = siguiente;
+      while (d < metric.length) {
+        final double siguiente = d + (dibujar ? dashWidth : gapWidth);
+        if (dibujar) canvas.drawPath(metric.extractPath(d, math.min(siguiente, metric.length)), paint);
+        d = siguiente;
         dibujar = !dibujar;
       }
     }
@@ -683,4 +780,18 @@ class EspejoCurvoPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant EspejoCurvoPainter oldDelegate) => true;
+}
+
+class _RayoPrincipal {
+  final Offset origen;
+  final Offset direccionFisica;
+  final Color color;
+  const _RayoPrincipal(this.origen, this.direccionFisica, this.color);
+}
+
+extension on Offset {
+  Offset clampToSize(Size size) => Offset(
+    dx.clamp(0.0, size.width),
+    dy.clamp(0.0, size.height),
+  );
 }

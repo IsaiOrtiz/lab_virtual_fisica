@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class InterferenciaSim extends StatefulWidget {
@@ -32,7 +31,6 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
   final GlobalKey _globalKeyCaptura = GlobalKey();
 
   // Controlador de transformación para Zoom y Pan (desplazamiento) táctil/con botones
-  final TransformationController _transformationController = TransformationController();
 
   // Parámetros Onda 1 (Azul)
   double amp1 = 30.0;
@@ -71,7 +69,6 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -218,7 +215,6 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
             // Tamaño real del área de dibujo (sin contar el panel lateral),
             // usado para centrar el zoom con los botones.
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -275,8 +271,7 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
                       // RepaintBoundary encapsula el área de dibujo para congelar sus pixeles en la captura
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
+                        child: SimulationCanvas(
                           fondoPainter: const _FondoReglaInterferencia(),
                           contenidoPainter: WavePainter(
                             tiempo: tiempo,
@@ -288,14 +283,6 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
                       ),
 
                       // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
-                        ),
-                      ),
 
                       // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(
@@ -418,7 +405,7 @@ class _InterferenciaSimState extends State<InterferenciaSim> {
 
 /// Fondo FIJO con la cuadrícula y las reglas en cm/m. Se pinta en una
 /// capa aparte que nunca se transforma con el zoom/pan (ver
-/// [ZoomableSimulationCanvas]), así el "plano" de laboratorio siempre
+/// [SimulationCanvas]), así el "plano" de laboratorio siempre
 /// ocupa el mismo espacio en pantalla; solo las curvas de onda (dibujadas
 /// por [WavePainter]) se acercan o desplazan.
 class _FondoReglaInterferencia extends CustomPainter {

@@ -8,8 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/navegacion_simulacion.dart';
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 
 /// Los 4 materiales disponibles para combinar en la refracción. El mismo
 /// material no puede elegirse en ambos lados de la interfaz.
@@ -43,7 +42,6 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Índices dentro de materialesRefraccion. Nunca pueden ser iguales.
   int indiceMedio1 = 0; // Aire, arriba
@@ -86,7 +84,6 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -231,7 +228,6 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
           builder: (context, constraints) {
             final altoDisponible = constraints.maxHeight;
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -332,9 +328,8 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
-                          fondoPainter: const FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
+                        child: SimulationCanvas(
+                          fondoPainter: FondoCuadriculaPainter(colorFondo: Colors.white, colorLineas: Colors.black),
                           contenidoPainter: RefraccionPainter(
                             tiempo: tiempo,
                             nombreMedio1: materialesRefraccion[indiceMedio1].$1,
@@ -348,14 +343,6 @@ class _RefraccionLuzSimState extends State<RefraccionLuzSim> {
                             mostrarReflexionParcial: mostrarReflexionParcial,
                             mostrarAngulos: mostrarAngulos,
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
                         ),
                       ),
                       Positioned(

@@ -143,7 +143,7 @@ class MenuPrincipal extends StatelessWidget {
       ModuloData(
         titulo: 'Lentes Delgadas',
         archivoTeoria: 'assets/teoria/lentes.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => LenteDelgadaSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Óptica',
       ),
       ModuloData(

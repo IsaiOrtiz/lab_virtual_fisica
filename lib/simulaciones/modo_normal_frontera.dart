@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui; // Necesario para convertir el boundary en imagen bytes
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/fondo_regla_tubo.dart';
 import '../widgets/navegacion_simulacion.dart';
 
@@ -47,7 +46,6 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   // Condición de frontera y armónico (k) actualmente seleccionado.
   CondicionFrontera condicion = CondicionFrontera.fijoAbierto;
@@ -140,7 +138,6 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -272,7 +269,6 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
 
             // Tamaño real del área de dibujo (sin contar el panel lateral)
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -401,8 +397,7 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                     children: [
                       RepaintBoundary(
                         key: _globalKeyCaptura,
-                        child: ZoomableSimulationCanvas(
-                          controller: _transformationController,
+                        child: SimulationCanvas(
                           fondoPainter: FondoReglaTuboNormal(longitudFisica: longitudCuerda),
                           contenidoPainter: NormalModeFronteraPainter(
                             tiempo: tiempo,
@@ -417,14 +412,6 @@ class _ModosNormalesFronteraSimState extends State<ModosNormalesFronteraSim> {
                       ),
 
                       // PANEL DE ZOOM Y DESPLAZAMIENTO (arriba a la derecha)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
-                        ),
-                      ),
 
                       // ACCESO RÁPIDO A TEORÍA / CUESTIONARIO (arriba a la izquierda)
                       Positioned(

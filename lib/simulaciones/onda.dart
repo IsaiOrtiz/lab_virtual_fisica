@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui;
-import '../widgets/zoom_pan_controls.dart';
-import '../widgets/zoomable_simulation_canvas.dart';
+import '../widgets/simulation_canvas.dart';
 import '../widgets/navegacion_simulacion.dart';
 
 class OndaViajeraSim extends StatefulWidget {
@@ -27,7 +26,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
   bool _estaCorriendo = true;
 
   final GlobalKey _globalKeyCaptura = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
 
   double amplitud = 40.0;
   double frecuencia = 1.0;
@@ -55,7 +53,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
   @override
   void dispose() {
     _timer?.cancel();
-    _transformationController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -187,7 +184,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
             if (amplitud > ampMaxDinamica) amplitud = ampMaxDinamica;
 
             final double anchoCanvas = constraints.maxWidth - (_mostrarControles ? 280 : 0);
-            final Size tamanoCanvas = Size(anchoCanvas, altoDisponible);
 
             return Row(
               children: [
@@ -271,8 +267,7 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                               ),
                             ),
                             // 2. Capa de la onda con zoom y desplazamiento
-                            ZoomableSimulationCanvas(
-                              controller: _transformationController,
+                            SimulationCanvas(
                               colorFondo: Colors.transparent, // Transparente para ver el fondo blanco debajo
                               contenidoPainter: SingleWavePainter(
                                 tiempo: tiempo,
@@ -284,15 +279,6 @@ class _OndaViajeraSimState extends State<OndaViajeraSim> {
                               ),
                             ),
                           ],
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: ZoomPanControls(
-                          controller: _transformationController,
-                          viewportSize: tamanoCanvas,
                         ),
                       ),
 
