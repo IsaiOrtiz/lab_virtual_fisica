@@ -49,7 +49,9 @@ class _LenteDelgadaSimState extends State<LenteDelgadaSim> {
     // Ecuación del fabricante, suponiendo aire como medio exterior:
     // 1/f = (n_lente/n_medio - 1) (1/R1 - 1/R2)
     final factor = indice / 1.0 - 1.0;
-    final invF = factor * (1 / radio1 - 1 / radio2);
+    final r1 = tipo == TipoLente.convergente ? radio1.abs() : -radio1.abs();
+    final r2 = tipo == TipoLente.convergente ? -radio2.abs() : radio2.abs();
+    final invF = factor * (1 / r1 - 1 / r2);
     if (invF.abs() < 1e-9) return double.infinity;
     return 1 / invF;
   }
@@ -107,8 +109,8 @@ class _LenteDelgadaSimState extends State<LenteDelgadaSim> {
                         ),
                         const Divider(height: 22),
                         _slider('n', indice, 1.30, 1.80, (v) => setState(() => indice = v), 2),
-                        _slider('R₁', radio1, -20, 20, (v) => setState(() => radio1 = v.abs() < 0.5 ? (v < 0 ? -0.5 : 0.5) : v), 1),
-                        _slider('R₂', radio2, -20, 20, (v) => setState(() => radio2 = v.abs() < 0.5 ? (v < 0 ? -0.5 : 0.5) : v), 1),
+                        _slider('R₁', radio1.abs(), 3, 20, (v) => setState(() => radio1 = v), 1),
+                        _slider('R₂', radio2.abs(), 3, 20, (v) => setState(() => radio2 = v), 1),
                         _slider('dₒ', distanciaObjeto, 4, 35, (v) => setState(() => distanciaObjeto = v), 1),
                         _slider('hₒ', alturaObjeto, 2, 8, (v) => setState(() => alturaObjeto = v), 1),
                         const Divider(height: 22),
@@ -130,6 +132,8 @@ class _LenteDelgadaSimState extends State<LenteDelgadaSim> {
                         Text('Ecuación del fabricante', style: GoogleFonts.lato(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54)),
                         const SizedBox(height: 5),
                         Text('1/f = (n − 1)(1/R₁ − 1/R₂)', style: GoogleFonts.sourceCodePro(fontSize: 10, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Signos: convergente (+R₁, −R₂); divergente (−R₁, +R₂).', style: GoogleFonts.lato(fontSize: 9, color: Colors.blueGrey[700])),
                         const SizedBox(height: 8),
                         _dato('Distancia focal f:', f.isFinite ? f.toStringAsFixed(2) : '∞'),
                         _dato('Distancia imagen dᵢ:', di == null ? '∞' : di.toStringAsFixed(2)),
@@ -250,96 +254,92 @@ class LenteDelgadaPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double f = focal.isFinite ? focal : 1000;
-    final double minX = math.min(-distanciaObjeto, math.min(-f.abs() * 1.15, distanciaImagen == null ? 0 : -distanciaImagen!.abs())) - 4;
-    final double maxX = math.max(distanciaObjeto * 0.15, math.max(f.abs() * 1.15, distanciaImagen == null ? 0 : -distanciaImagen!.abs())) + 4;
-    final double rangeX = math.max(1, maxX - minX);
-    final double rangeY = math.max(15, alturaObjeto * 2 + 7);
-    final double scale = math.min((size.width - 80) / rangeX, (size.height - 110) / rangeY).clamp(8.0, 25.0).toDouble();
-    final double axisY = size.height * 0.56;
-    final double originX = (size.width - rangeX * scale) / 2 - minX * scale;
-    Offset p(double x, double y) => Offset(originX + x * scale, axisY - y * scale);
+    if (size.width < 60 || size.height < 80) return;
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    final cx = size.width * 0.5;
+    final axisY = size.height * 0.56;
+    final maxWorldX = ((size.width * 0.5 - 36) / 9.0).clamp(5.0, 40.0).toDouble();
+    final maxWorldY = ((size.height * 0.5 - 44) / 9.0).clamp(4.0, 18.0).toDouble();
+    final scale = math.min((size.width * 0.5 - 36) / maxWorldX, (size.height * 0.5 - 44) / maxWorldY).clamp(5.0, 18.0).toDouble();
+    double safeX(double x) => x.clamp(-maxWorldX, maxWorldX).toDouble();
+    double safeY(double y) => y.clamp(-maxWorldY, maxWorldY).toDouble();
+    Offset p(double x, double y) => Offset(cx + safeX(x) * scale, axisY - safeY(y) * scale);
 
-    canvas.drawLine(Offset(20, axisY), Offset(size.width - 20, axisY), Paint()..color = eje.withOpacity(0.55)..strokeWidth = 1.2);
+    // El lente es una figura ovalada estática; los rayos se trazan sobre un único eje vertical.
+    canvas.drawLine(Offset(16, axisY), Offset(size.width - 16, axisY), Paint()..color = eje.withOpacity(0.62)..strokeWidth = 1.3);
+    final lensRect = Rect.fromCenter(center: Offset(cx, axisY), width: 30, height: math.min(size.height * 0.62, 220));
+    canvas.drawOval(lensRect, Paint()..color = lente.withOpacity(0.16)..style = PaintingStyle.fill);
+    canvas.drawOval(lensRect, Paint()..color = lente..style = PaintingStyle.stroke..strokeWidth = 2.3);
+    canvas.drawLine(Offset(cx, lensRect.top - 8), Offset(cx, lensRect.bottom + 8), Paint()..color = lente.withOpacity(0.4)..strokeWidth = 1);
 
-    // Lente biconvexa / bicóncava estilizada, manteniendo el eje óptico.
-    final double lensH = math.min(7.0, math.max(4.5, alturaObjeto * 0.9));
-    final Path lentePath = Path();
-    if (tipo == TipoLente.convergente) {
-      lentePath.moveTo(p(0, lensH).dx, p(0, lensH).dy);
-      lentePath.quadraticBezierTo(p(1.8, lensH * 0.35).dx, p(1.8, lensH * 0.35).dy, p(0, 0).dx, p(0, 0).dy);
-      lentePath.quadraticBezierTo(p(1.8, -lensH * 0.35).dx, p(1.8, -lensH * 0.35).dy, p(0, -lensH).dx, p(0, -lensH).dy);
-      lentePath.quadraticBezierTo(p(-1.8, -lensH * 0.35).dx, p(-1.8, -lensH * 0.35).dy, p(0, 0).dx, p(0, 0).dy);
-      lentePath.quadraticBezierTo(p(-1.8, lensH * 0.35).dx, p(-1.8, lensH * 0.35).dy, p(0, lensH).dx, p(0, lensH).dy);
-    } else {
-      lentePath.moveTo(p(0, lensH).dx, p(0, lensH).dy);
-      lentePath.quadraticBezierTo(p(-1.8, lensH * 0.35).dx, p(-1.8, lensH * 0.35).dy, p(0, 0).dx, p(0, 0).dy);
-      lentePath.quadraticBezierTo(p(-1.8, -lensH * 0.35).dx, p(-1.8, -lensH * 0.35).dy, p(0, -lensH).dx, p(0, -lensH).dy);
-      lentePath.quadraticBezierTo(p(1.8, -lensH * 0.35).dx, p(1.8, -lensH * 0.35).dy, p(0, 0).dx, p(0, 0).dy);
-      lentePath.quadraticBezierTo(p(1.8, lensH * 0.35).dx, p(1.8, lensH * 0.35).dy, p(0, lensH).dx, p(0, lensH).dy);
-    }
-    canvas.drawPath(lentePath, Paint()..color = lente.withOpacity(0.16)..style = PaintingStyle.fill);
-    canvas.drawPath(lentePath, Paint()..color = lente..style = PaintingStyle.stroke..strokeWidth = 2.5);
-
-    if (focal.isFinite) {
-      _marca(canvas, p(-f, 0), 'F', const Color(0xFF00695C));
-      _marca(canvas, p(f, 0), 'F′', const Color(0xFF00695C));
-      if (mostrarEtiquetas) {
-        _marca(canvas, p(0, 0), 'O', eje);
-      }
+    final f = focal.isFinite ? focal : (tipo == TipoLente.convergente ? 10.0 : -10.0);
+    if (mostrarEtiquetas) {
+      _marca(canvas, p(-f.abs(), 0), 'F', const Color(0xFF00695C));
+      _marca(canvas, p(f.abs(), 0), "F′", const Color(0xFF00695C));
+      _marca(canvas, Offset(cx, axisY), 'O', eje);
     }
 
-    _flecha(canvas, p(-distanciaObjeto, 0), p(-distanciaObjeto, alturaObjeto), objeto);
+    final xo = -safeX(distanciaObjeto);
+    final yo = safeY(alturaObjeto.clamp(1.0, maxWorldY * 0.72));
+    final objectTip = p(xo, yo);
+    _flecha(canvas, p(xo, 0), objectTip, objeto);
 
-    if (mostrarRayos && focal.isFinite) {
-      // Rayo 1: paralelo al eje antes de la lente.
-      final hit1 = p(0, alturaObjeto);
-      _linea(canvas, p(-distanciaObjeto, alturaObjeto), hit1, rayo1);
-      final double targetF = tipo == TipoLente.convergente ? f : f;
-      final Offset fin1 = tipo == TipoLente.convergente
-          ? p(targetF + 30, -(alturaObjeto / math.max(0.1, targetF)) * 30)
-          : p(targetF, 0);
-      if (tipo == TipoLente.convergente) {
-        _linea(canvas, hit1, fin1, rayo1);
+    double? di = distanciaImagen;
+    double? hi = alturaImagen;
+    if (di == null || hi == null || !di.isFinite || !hi.isFinite) {
+      di = tipo == TipoLente.convergente ? maxWorldX : -maxWorldX * 0.7;
+      hi = 0;
+    }
+    final xi = safeX(di);
+    final yi = safeY(hi.clamp(-maxWorldY * 0.8, maxWorldY * 0.8));
+    final imageBase = p(xi, 0);
+    final imageTip = p(xi, yi);
+
+    if (mostrarRayos) {
+      final hitParallel = Offset(cx, objectTip.dy);
+      _linea(canvas, objectTip, hitParallel, rayo1);
+      if ((distanciaImagen ?? 1) > 0) {
+        _linea(canvas, hitParallel, imageTip, rayo1);
       } else {
-        // En una divergente el rayo sale paralelo a la línea que apunta
-        // hacia el foco virtual del lado del objeto.
-        final dir = _norm(Offset(-f, alturaObjeto));
-        _linea(canvas, hit1, hit1 + dir * 42 * scale, rayo1);
-        _punteada(canvas, hit1, p(f, 0), rayo1);
+        final slopeY = yo * (1 - maxWorldX / math.max(0.1, distanciaObjeto));
+        final outgoing = p(maxWorldX, slopeY);
+        _linea(canvas, hitParallel, outgoing, rayo1);
+        _punteada(canvas, hitParallel, imageTip, rayo1);
       }
 
-      // Rayo 2: pasa por el centro óptico sin desviarse.
-      _linea(canvas, p(-distanciaObjeto, alturaObjeto), p(35, -alturaObjeto * 35 / math.max(1, distanciaObjeto)), rayo2);
+      // Rayo central: atraviesa el centro óptico sin desviarse.
+      if ((distanciaImagen ?? 1) > 0) {
+        _linea(canvas, objectTip, imageTip, rayo2);
+      } else {
+        final endY = -yo * maxWorldX / math.max(0.1, distanciaObjeto);
+        _linea(canvas, objectTip, p(maxWorldX, endY), rayo2);
+        _punteada(canvas, p(0, 0), imageTip, rayo2);
+      }
 
-      // Rayo 3: por el foco (convergente) o dirigido al foco lejano
-      // (divergente), y después paralelo.
-      final Offset focoIncidente = tipo == TipoLente.convergente ? p(-f, 0) : p(-f, 0);
-      final Offset objetoP = p(-distanciaObjeto, alturaObjeto);
-      final double denomX = focoIncidente.dx - objetoP.dx;
-      if (denomX.abs() > 1e-6) {
-        final double t = (p(0, 0).dx - objetoP.dx) / denomX;
-        final Offset hit3 = Offset(objetoP.dx + (focoIncidente.dx - objetoP.dx) * t, objetoP.dy + (focoIncidente.dy - objetoP.dy) * t);
-        _linea(canvas, objetoP, hit3, rayo3);
-        if (tipo == TipoLente.convergente) {
-          _linea(canvas, hit3, p(35, hit3PhysicalY(hit3, axisY, scale)), rayo3);
+      // Tercer rayo principal: hacia el foco objeto en convergente; dirigido al foco imagen virtual en divergente.
+      final focusX = tipo == TipoLente.convergente ? -f.abs() : f.abs();
+      final focus = p(focusX, 0);
+      final den = focus.dx - objectTip.dx;
+      if (den.abs() > 1e-6) {
+        final t = (cx - objectTip.dx) / den;
+        final hit = Offset(cx, objectTip.dy + (focus.dy - objectTip.dy) * t);
+        _linea(canvas, objectTip, hit, rayo3);
+        if ((distanciaImagen ?? 1) > 0) {
+          _linea(canvas, hit, imageTip, rayo3);
         } else {
-          _linea(canvas, hit3, p(35, hit3PhysicalY(hit3, axisY, scale)), rayo3);
-          _punteada(canvas, hit3, focoIncidente, rayo3);
+          _linea(canvas, hit, Offset(size.width - 18, hit.dy + (hit.dy - focus.dy) * 0.8), rayo3);
+          _punteada(canvas, hit, imageTip, rayo3);
         }
       }
     }
-
-    if (distanciaImagen != null && alturaImagen != null && distanciaImagen!.abs() < 100) {
-      _flecha(canvas, p(distanciaImagen!, 0), p(distanciaImagen!, alturaImagen!), imagen, punteada: distanciaImagen! < 0);
-    }
+    // La imagen se mantiene dentro del lienzo incluso cuando |di| o |hi| son enormes.
+    _flecha(canvas, imageBase, imageTip, imagen, punteada: (distanciaImagen ?? 0) < 0);
 
     final title = tipo == TipoLente.convergente ? 'Lente convergente' : 'Lente divergente';
-    final tp = TextPainter(
-      text: TextSpan(text: title, style: GoogleFonts.sourceCodePro(fontSize: 11, color: eje, fontWeight: FontWeight.bold)),
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final tp = TextPainter(text: TextSpan(text: title, style: GoogleFonts.sourceCodePro(fontSize: 11, color: eje, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)..layout(maxWidth: size.width - 20);
     tp.paint(canvas, Offset((size.width - tp.width) / 2, 12));
+    canvas.restore();
   }
 
   double hit3PhysicalY(Offset point, double axisY, double scale) => (axisY - point.dy) / scale;

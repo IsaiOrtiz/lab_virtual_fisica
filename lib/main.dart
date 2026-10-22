@@ -149,7 +149,7 @@ class MenuPrincipal extends StatelessWidget {
       ModuloData(
         titulo: 'Principio de Bernoulli',
         archivoTeoria: 'assets/teoria/bernoulli.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => VenturiSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Fluidos',
       ),
       ModuloData(
