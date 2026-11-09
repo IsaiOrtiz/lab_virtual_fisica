@@ -152,18 +152,18 @@ class MenuPrincipal extends StatelessWidget {
         construirSimulacion: (irATeoria, irACuestionario, onCapturar) => VenturiSim(onIrATeoria: irATeoria, onIrACuestionario: irACuestionario, onCapturar: onCapturar),
         categoria: 'Fluidos',
       ),
-      ModuloData(
-        titulo: 'Conservación del Gasto',
-        archivoTeoria: 'assets/teoria/gasto.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
-        categoria: 'Fluidos',
-      ),
-      ModuloData(
-        titulo: 'Conservación de la Energía',
-        archivoTeoria: 'assets/teoria/energia.txt',
-        construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
-        categoria: 'Fluidos',
-      ),
+      // ModuloData(
+      //   titulo: 'Conservación del Gasto',
+      //   archivoTeoria: 'assets/teoria/gasto.txt',
+      //   construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+      //   categoria: 'Fluidos',
+      // ),
+      // ModuloData(
+      //   titulo: 'Conservación de la Energía',
+      //   archivoTeoria: 'assets/teoria/energia.txt',
+      //   construirSimulacion: (irATeoria, irACuestionario, onCapturar) => const Placeholder(),
+      //   categoria: 'Fluidos',
+      // ),
       ModuloData(
         titulo: 'Ecuación de Poiseuille',
         archivoTeoria: 'assets/teoria/poiseuille.txt',
